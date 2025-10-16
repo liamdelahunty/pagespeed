@@ -1,40 +1,50 @@
-# PageSpeed Insights CSV Collector
-A tiny Python utility that reads a list of URLs, calls the Google PageSpeed Insights v5 API (desktop + mobile), extracts the five Lighthouse category scores plus the core performance metrics, and writes a timestamped CSV file you can open in Excel, LibreOffice, or pandas.
+# PageSpeed Insights CSV Collector
+A Python utility that:
+* reads a list of URLs, 
+* calls the Google PageSpeed Insights v5 API (desktop + mobile), 
+* extracts the five Lighthouse category scores plus the core performance metrics, 
+* writes a timestamped CSV file,
+* and the JSON response.
 
 ## ✨ What it does
-Loads URLs from urls.txt (one per line).
-Queries the API for Performance, Accessibility, Best‑Practices, SEO, PWA.
-Retrieves FCP, Speed Index, LCP, TTI, TBT, CLS, SRT.
-Saves a file named pagespeed-report-YYYY‑MM‑DD‑HHMM.csv.
-Dumps the raw JSON responses to debug-responses/ for troubleshooting.
-All results are deterministic (no cache, no cookies, fixed throttling), making the CSV comparable across users and locations.
+* Loads URLs from urls.txt (one per line).
+* Queries the API for Performance, Accessibility, Best‑Practices, SEO, PWA.
+* Retrieves FCP, Speed Index, LCP, TTI, TBT, CLS, SRT.
+* Saves a file named pagespeed-report-YYYY‑MM‑DD‑HHMM.csv.
+* Dumps the raw JSON responses to debug-responses/ for troubleshooting.
+* All results are deterministic (no cache, no cookies, fixed throttling), making the CSV comparable across users and locations.
 
 ## 📦 Prerequisites
-Python 3.8+ (official installer from https://python.org).
+Python 3.8+ (official installer from https://python.org).
 
 Upgrade pip (optional but recommended):
 
-py -m pip install --upgrade pip
+```py -m pip install --upgrade pip```
 
 Install required packages (run in the project folder):
 
-py -m pip install requests tqdm python-dotenv
+```py -m pip install requests tqdm python-dotenv```
+
 Create a Google Cloud API key with the PageSpeed Insights API enabled.
 Store it in a .env file (same folder as the script):
 
-PSI_API_KEY=YOUR_GOOGLE_API_KEY
-Prepare the URL list – a plain‑text file named urls.txt:
+```PSI_API_KEY=YOUR_GOOGLE_API_KEY```
 
+Prepare the URL list – a plain‑text file named urls.txt:
+```
 https://example.com
 https://another-site.org/page
+```
 
 ### 🚀 How to run
-From the folder that contains pagespeed_to_csv.py
-python pagespeed_to_csv.py
+From the folder that contains pagespeed_to_csv.py if Python is in your system path.
+```py pagespeed_to_csv.py```
 
-The script will:
+Or run from your IDE: VS Code or Python3 IDLE.
+
+### The script will:
 Print a progress bar (tqdm).
-Create pagespeed-report-2025-10-15-1432.csv (timestamp varies).
+Create pagespeed-report-YYYY-MM-DD-HHmm.csv (timestamp varies).
 Save raw API responses under debug-responses/ (optional, for debugging).
 
 ## 📋 Configuration Notes  
@@ -62,5 +72,8 @@ Save raw API responses under debug-responses/ (optional, for debugging).
 | Script runs very slowly or times out | Network throttling on your side or the target site is extremely slow. | Increase the `timeout` value in `call_pagespeed` (e.g., `timeout=180`). |
 | CSV file not created or empty | `urls.txt` missing or contains no valid URLs. | Ensure `urls.txt` exists in the repo root and has at least one non‑blank line with a full URL (`https://example.com`). |
 | Raw JSON files not appearing | `debug-responses/` folder not created or path incorrect. | Verify the `out_dir` path in `dump_response`. If you moved the CSV folder to `reports/`, also update the debug folder to `REPORTS_DIR / "debug-responses"` (see the folder‑change snippet). |
-| Different users get different results | Users are running the script locally with their own Chrome version or caching. | Use the **PageSpeed Insights API** (or a Docker‑wrapped Lighthouse with a pinned Chrome version) for deterministic, location‑independent results. |
+| Different users get different results | Users are running the script locally with their own Chrome version or caching. | Use the **PageSpeed Insights API**  for deterministic, location‑independent results. |
 | “Permission denied” when installing packages on Windows | Running the command without admin rights. | Add the `--user` flag: `py -m pip install --user requests tqdm python-dotenv`, or run the terminal as Administrator. |
+
+
+Happy monitoring!
