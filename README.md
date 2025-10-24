@@ -25,7 +25,7 @@ Install required packages (run in the project folder):
 
 ```py -m pip install requests tqdm python-dotenv```
 
-Create a Google Cloud API key with the PageSpeed Insights API enabled.
+Create a Google Cloud API key with the [PageSpeed Insights API](https://developers.google.com/speed/docs/insights/v5/get-started) enabled.
 Store it in a .env file (same folder as the script):
 
 ```PSI_API_KEY=YOUR_GOOGLE_API_KEY```
@@ -46,6 +46,7 @@ Or run from your IDE: VS Code or Python3 IDLE.
 Print a progress bar (tqdm).
 Create pagespeed-report-YYYY-MM-DD-HHmm.csv (timestamp varies).
 Save raw API responses under debug-responses/ (optional, for debugging).
+This can easily be read with the Lighthouse Viewer in the [Lighthouse Chrome Extension](https://chromewebstore.google.com/detail/lighthouse/blipmdconlkpinefehnmjammfjpmpbjk) or directly using the [Lighthouse viewer page](https://googlechrome.github.io/lighthouse/viewer/).
 
 ## 📋 Configuration Notes  
 
@@ -65,7 +66,7 @@ Save raw API responses under debug-responses/ (optional, for debugging).
 
 | Symptom | Likely Cause | Fix |
 |---------|--------------|-----|
-| `NameError: PSI_API_KEY` | `.env` file missing, mis‑named, or variable not set. | Create a `.env` file in the project root with `PSI_API_KEY=YOUR_GOOGLE_API_KEY`. Ensure the file is saved and the variable name is spelled exactly. |
+| `NameError: PSI_API_KEY` | `.env` file missing, mis‑named, or variable not set. | Create a `.env` file in the project root with `PSI_API_KEY=YOUR_GOOGLE_API_KEY`. Ensure the file is saved and the variable name is spelled exactly. [Select "Get a Key" on this page.](https://developers.google.com/speed/docs/insights/v5/get-started) |
 | `400 Bad Request` from the API | API key restricted (referrer/IP) or malformed request parameters. | In Google Cloud Console → **APIs & Services → Credentials** → edit the key → set **Application restrictions** to **None** (or add your public IP). Also verify the `category` list is a Python list, not a comma‑separated string. |
 | `ModuleNotFoundError: requests` (or `tqdm`, `python‑dotenv`) | Dependencies not installed. | Run `py -m pip install --upgrade pip` then `py -m pip install requests tqdm python-dotenv`. |
 | Scores are all `0` (Performance, Accessibility, etc.) | Wrong `category` format or API response missing those fields. | Use the list version for `category` (see the **Categories** row above). |

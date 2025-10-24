@@ -4,10 +4,21 @@ pagespeed_to_csv.py
 Collect PageSpeed Insights / Lighthouse data for a list of URLs
 and dump the results into a CSV file.
 
+Change Log
+----------
+2025-10-24 - v1.2
+    • Dropped the “PWA” category because the PageSpeed Insights API no longer returns it.  
+    All references to the PWA column have been removed from:
+        - the CSV header (`write_csv_header`)
+        - the metric extraction (`extract_metrics`)
+        - the row-building logic in `main()`.
+    • Updated documentation throughout the file to reflect the new set of categories:
+      Performance, Accessibility, Best-Practices, SEO.
+
 Features
 --------
 * Handles both desktop and mobile strategies.
-* Extracts overall category scores (Performance, Accessibility, Best Practices, SEO, PWA).
+* Extracts overall category scores (Performance, Accessibility, Best Practices, SEO).
 * Extracts the most common performance metrics:
     - First Contentful Paint (FCP)
     - Speed Index
@@ -17,7 +28,7 @@ Features
     - Cumulative Layout Shift (CLS)
     - Server Response Time (SRT)
 * Simple CSV output.
-* Saves a file named pagespeed-report-YYYY‑MM‑DD‑HHMM.csv
+* Saves a file named pagespeed-report-YYYY-MM-DD-HHMM.csv
 * Dumps the raw JSON responses to debug-responses/
 * Both saved with ISO date string for archiving.
 * Basic error handling + progress bar.
@@ -54,7 +65,7 @@ Default:        ("desktop", "mobile")
 How to change:  Modify STRATEGIES tuple.
 
 Setting:        Categories  
-Default:        All five (performance, accessibility, best‑practices, seo, pwa) 
+Default:        All four (performance, accessibility, best-practices, seo) 
 How to change:  Adjust the category list in call_pagespeed.
 
 Setting:        Timeout 
@@ -75,7 +86,7 @@ Symptom:        ModuleNotFoundError: requests
 Likely cause:   Dependencies not installed	
 Fix:            Run py -m pip install requests tqdm python-dotenv.
 
-Author: Liam Victor Delahunty – October 2025
+Author: Liam Victor Delahunty - October 2025
 """
 import os
 import sys
@@ -102,14 +113,14 @@ REPORTS_DIR.mkdir(parents=True, exist_ok=True)   # creates ./reports if missing
 load_dotenv()
 API_KEY = os.getenv("PSI_API_KEY")
 if not API_KEY:
-    raise RuntimeError("PSI_API_KEY not found – check your .env file.")
+    raise RuntimeError("PSI_API_KEY not found - check your .env file.")
 
 API_ENDPOINT = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
 TIMESTAMP = datetime.datetime.now().strftime("%Y-%m-%d-%H%M")
 OUTPUT_CSV = REPORTS_DIR / f"pagespeed-report-{TIMESTAMP}.csv"
 URLS_FILE = "urls.txt"
 
-# Strategies we want to query – keep both unless you deliberately want only one.
+# Strategies we want to query - keep both unless you deliberately want only one.
 STRATEGIES = ("desktop", "mobile")
 
 
@@ -142,8 +153,7 @@ def call_pagespeed(url: str, strategy: str) -> dict:
             "performance",
             "accessibility",
             "best-practices",
-            "seo",
-            "pwa",
+            "seo"
         ],
     }
     try:
@@ -154,7 +164,7 @@ def call_pagespeed(url: str, strategy: str) -> dict:
         raise RuntimeError(f"Request failed for {url} ({strategy}): {exc}") from exc
 
 def dump_response(data: dict, url: str, strategy: str):
-    """Write the raw JSON to a readable file for debugging."""
+    """Write the raw JSON to a readable file for debugging/storage."""
     out_dir = pathlib.Path("debug-responses")
     out_dir.mkdir(exist_ok=True)
 
@@ -179,14 +189,13 @@ def extract_metrics(data: dict) -> Dict[str, object]:
             cur = cur.get(p, {})
         return cur if cur != {} else default
 
-    # Category scores (0‑1 range, convert to 0‑100)
+    # Category scores (0-1 range, convert to 0-100)
     cats = data.get("lighthouseResult", {}).get("categories", {})
     perf_score = int(_get(["lighthouseResult", "categories", "performance", "score"], 0) * 100)
     acc_score  = int(_get(["lighthouseResult", "categories", "accessibility", "score"], 0) * 100)
     bp_score   = int(_get(["lighthouseResult", "categories", "best-practices", "score"], 0) * 100)
     seo_score  = int(_get(["lighthouseResult", "categories", "seo", "score"], 0) * 100)
-    pwa_score  = int(_get(["lighthouseResult", "categories", "pwa", "score"], 0) * 100)
-
+    
     # Performance metrics (numericValue is in ms for timing metrics,
     # unitless for CLS)
     audits = data.get("lighthouseResult", {}).get("audits", {})
@@ -203,7 +212,6 @@ def extract_metrics(data: dict) -> Dict[str, object]:
         "AccessibilityScore": acc_score,
         "BestPracticesScore": bp_score,
         "SEOScore": seo_score,
-        "PWAScore": pwa_score,
         "FCP_ms": fcp,
         "SpeedIndex_ms": si,
         "LCP_ms": lcp,
@@ -224,7 +232,6 @@ def write_csv_header(csv_path: str):
         "AccessibilityScore",
         "BestPracticesScore",
         "SEOScore",
-        "PWAScore",
         "FCP_ms",
         "SpeedIndex_ms",
         "LCP_ms",
@@ -267,7 +274,7 @@ def main():
                 dump_response(data, url, strat)   
                 metrics = extract_metrics(data)
 
-                # Build the CSV row – order must match the header defined above
+                # Build the CSV row - order must match the header defined above
                 csv_row = [
                     time.strftime("%Y-%m-%d"),   # Date
                     url,
@@ -277,7 +284,6 @@ def main():
                     metrics["AccessibilityScore"],
                     metrics["BestPracticesScore"],
                     metrics["SEOScore"],
-                    metrics["PWAScore"],
                     metrics["FCP_ms"],
                     metrics["SpeedIndex_ms"],
                     metrics["LCP_ms"],
@@ -285,7 +291,7 @@ def main():
                     metrics["TBT_ms"],
                     metrics["CLS"],
                     metrics["SRT_ms"],
-                    "",                         # Notes – you can fill manually later
+                    "",                         # Notes - you can fill manually later
                 ]
 
                 append_row(OUTPUT_CSV, csv_row)
