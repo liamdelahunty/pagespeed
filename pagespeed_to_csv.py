@@ -258,7 +258,17 @@ def append_row(csv_path: str, row: List[object]):
 # ----------------------------------------------------------------------
 def main():
     parser = argparse.ArgumentParser(
-        description="Collect PageSpeed Insights data for a list of URLs or a single URL."
+        description="Collect PageSpeed Insights data for one or more URLs and save the results to a CSV file.",
+        epilog=(
+            "Examples:\n"
+            "  # Test a single URL\n"
+            "  python pagespeed_to_csv.py -u https://www.example.com\n\n"
+            "  # Test all URLs from a file named 'custom_urls.txt'\n"
+            "  python pagespeed_to_csv.py -f custom_urls.txt\n\n"
+            "  # Show this help message\n"
+            "  python pagespeed_to_csv.py --help"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter  # Keeps epilog formatting
     )
     parser.add_argument(
         "-f", "--url-file",

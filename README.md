@@ -8,7 +8,7 @@ A Python utility that:
 
 ## ✨ What it does
 * Loads URLs from urls.txt (one per line).
-* Queries the API for Performance, Accessibility, Best‑Practices, SEO, PWA.
+* Queries the API for Performance, Accessibility, Best‑Practices, SEO.
 * Retrieves FCP, Speed Index, LCP, TTI, TBT, CLS, SRT.
 * Saves a file named pagespeed-report-YYYY‑MM‑DD‑HHMM.csv.
 * Dumps the raw JSON responses to debug-responses/ for troubleshooting.
@@ -36,11 +36,30 @@ https://example.com
 https://another-site.org/page
 ```
 
-### 🚀 How to run
-From the folder that contains pagespeed_to_csv.py if Python is in your system path.
-```py pagespeed_to_csv.py```
+### 🚀 Usage
+The script can be run in two ways: by providing a single URL directly, or by providing a file containing a list of URLs.
 
-Or run from your IDE: VS Code or Python3 IDLE.
+**1. Test a single URL**
+
+Use the `-u` or `--url` flag to test a specific URL. This is useful for quick, one-off tests.
+
+```sh
+python pagespeed_to_csv.py --url https://www.example.com
+```
+
+**2. Test multiple URLs from a file**
+
+Use the `-f` or `--url-file` flag to point to a text file containing one URL per line. If you don't provide this flag, the script will automatically look for `urls.txt` in the same directory.
+
+```sh
+# This will use the default urls.txt
+python pagespeed_to_csv.py
+
+# This will use a custom file named my_urls.txt
+python pagespeed_to_csv.py --url-file my_urls.txt
+```
+
+If both `--url` and `--url-file` are provided, the single URL from `--url` takes precedence.
 
 ### The script will:
 Print a progress bar (tqdm).
@@ -54,7 +73,7 @@ This can easily be read with the Lighthouse Viewer in the [Lighthouse Chrome Ext
 |---------|---------|---------------|
 | **API endpoint** | `https://www.googleapis.com/pagespeedonline/v5/runPagespeed` | Edit the `API_ENDPOINT` constant near the top of `pagespeed_to_csv.py`. |
 | **Strategies** | `("desktop", "mobile")` | Modify the `STRATEGIES` tuple (`STRATEGIES = ("desktop",)` for only desktop, etc.). |
-| **Categories** | All five – `performance, accessibility, best‑practices, seo, pwa` | Change the `category` list inside `call_pagespeed` if you need a subset. |
+| **Categories** | All four – `performance, accessibility, best‑practices, seo` | Change the `category` list inside `call_pagespeed` if you need a subset. |
 | **Timeout** | `90` seconds | Adjust the `timeout=` argument in `requests.get(...)`. |
 | **Output folder** | CSV written to the repository root (or `reports/` if you applied the folder change) | Update `OUTPUT_CSV` (or `REPORTS_DIR`) constants. |
 | **Debug JSON dump folder** | `debug-responses/` (or `reports/debug-responses/` after folder change) | Change the `out_dir` path inside `dump_response`. |
