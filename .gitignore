@@ -35,6 +35,11 @@ env.bak/
 .env
 .env.*
 
+# Ignore every *.txt file
+*.txt
+# …but keep the example
+!urls.example.txt
+
 # Debug / raw API responses (large JSON dumps you probably don’t want in Git)
 debug-responses/
 debug‑responses/**
