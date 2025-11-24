@@ -16,3 +16,8 @@ echo "https://www.croneri.co.uk" > urls.txt
 
 #6 Run the collector
 py pagespeed_to_csv.py or run the code in Python IDLE or VS Code.
+
+IDLE
+Choose *File → Open… (Ctrl+O).
+Navigate to the location of your .py file, select it, and click Open. The script loads into the editor window.
+Press F5 (or Run → Run Module) to execute.

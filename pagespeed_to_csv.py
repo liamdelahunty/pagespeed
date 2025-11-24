@@ -98,6 +98,7 @@ import pathlib
 import requests
 from tqdm import tqdm
 from dotenv import load_dotenv
+import argparse
 from typing import List, Dict
 from pathlib import Path
 
@@ -118,7 +119,7 @@ if not API_KEY:
 API_ENDPOINT = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
 TIMESTAMP = datetime.datetime.now().strftime("%Y-%m-%d-%H%M")
 OUTPUT_CSV = REPORTS_DIR / f"pagespeed-report-{TIMESTAMP}.csv"
-URLS_FILE = "urls.txt"
+
 
 # Strategies we want to query - keep both unless you deliberately want only one.
 STRATEGIES = ("desktop", "mobile")
@@ -256,11 +257,38 @@ def append_row(csv_path: str, row: List[object]):
 # MAIN LOGIC -----------------------------------------------------------
 # ----------------------------------------------------------------------
 def main():
+    parser = argparse.ArgumentParser(
+        description="Collect PageSpeed Insights data for a list of URLs or a single URL."
+    )
+    parser.add_argument(
+        "-f", "--url-file",
+        type=str,
+        default="urls.txt", # Default value now handled by argparse directly
+        help="Path to a file containing a list of URLs (one per line). Defaults to 'urls.txt'."
+    )
+    parser.add_argument(
+        "-u", "--url",
+        type=str,
+        help="A single URL to test. If provided, --url-file will be ignored."
+    )
+    args = parser.parse_args()
+
     if not API_KEY:
         print("[ERROR] Please set the PSI_API_KEY environment variable.", file=sys.stderr)
         sys.exit(1)
 
-    urls = load_urls(URLS_FILE)
+    urls: List[str] = []
+    if args.url:
+        urls.append(args.url)
+        print(f"🔎 Testing single URL: {args.url}")
+    else:
+        urls = load_urls(args.url_file)
+        print(f"🔎 Using URL file: {args.url_file}")
+
+    if not urls:
+        print("[ERROR] No URLs provided for testing. Exiting.", file=sys.stderr)
+        sys.exit(1)
+
     total_requests = len(urls) * len(STRATEGIES)
 
     print(f"🔎 Running PageSpeed Insights for {len(urls)} URLs ({total_requests} requests total)")
@@ -276,7 +304,7 @@ def main():
 
                 # Build the CSV row - order must match the header defined above
                 csv_row = [
-                    time.strftime("%Y-%m-%d"),   # Date
+                    time.strftime("%Y-%m-%d %H:%M"),   # Date
                     url,
                     "Desktop" if strat == "desktop" else "Mobile",
                     strat,
@@ -300,7 +328,7 @@ def main():
                 tqdm.write(f"[WARN] {url} ({strat}) → {e}")
                 # Write a row with empty scores so you can see which combos failed
                 empty_row = [
-                    time.strftime("%Y-%m-%d"),
+                    time.strftime("%Y-%m-%d %H:%M"),
                     url,
                     "Desktop" if strat == "desktop" else "Mobile",
                     strat,
