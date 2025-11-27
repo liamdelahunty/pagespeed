@@ -60,7 +60,12 @@ def main():
     parser.add_argument(
         "-s", "--site",
         type=str,
-        help="Generate a report for a specific site. Accepts a URL, domain, or the site's directory name (e.g., 'example-com')."
+        help="Generate a report for a specific site or page. Accepts a URL, domain, or the site's directory name. Defaults to the root page if a domain is given."
+    )
+    parser.add_argument(
+        "-d", "--deep-dive",
+        action="store_true",
+        help="Include all performance metrics (LCP, TBT, CLS, etc.) in the report. By default, only the Performance Score is shown."
     )
     args = parser.parse_args()
 
@@ -68,43 +73,77 @@ def main():
     
     base_dir = pathlib.Path("debug-responses")
     search_dir = base_dir
-    site_identifier = "all-sites" # Default for combined report
+    report_output_name_parts = [] # Parts for the output filename
+
+    all_reports = []
+    json_files = []
+    
+    # --- Determine target site directory and page slug ---
+    requested_site_dir_name = None
+    requested_page_slug = None
 
     if args.site:
-        # Normalize the input to find the correct site directory
         site_input = args.site
+        # Normalize the input to find the correct site directory
+        potential_site_dir = base_dir / site_input
         
-        # First, check if the input is a direct directory name match
-        potential_dir = base_dir / site_input
-        if potential_dir.is_dir():
-            search_dir = potential_dir
-            site_identifier = site_input
+        if potential_site_dir.is_dir(): # Direct directory name match
+            search_dir = potential_site_dir
+            requested_site_dir_name = site_input
+            requested_page_slug = site_input # Default to root if directory name provided
             print(f"✅ Found direct match for site directory: '{site_input}'")
-        else:
-            # If not, treat it as a URL/domain and normalize it
+        else: # Attempt to parse as a URL
             temp_url = site_input if "://" in site_input else f"https://{site_input}"
             parsed_url = urlparse(temp_url)
             
-            # Use netloc if it exists, otherwise use the original path as a fallback
-            domain_part = parsed_url.netloc or parsed_url.path
-            normalized_name = domain_part.replace("www.", "").replace(".", "-")
+            domain_part = parsed_url.netloc
+            if not domain_part: # Fallback if netloc is empty (e.g., local file path)
+                domain_part = parsed_url.path.split('/')[0] # Get first segment of path
+                
+            normalized_site_dir_name = domain_part.replace("www.", "").replace(".", "-")
             
-            potential_dir = base_dir / normalized_name
-            if potential_dir.is_dir():
-                search_dir = potential_dir
-                site_identifier = normalized_name
-                print(f"✅ Normalized '{site_input}' to site directory: '{normalized_name}'")
+            potential_site_dir = base_dir / normalized_site_dir_name
+            if potential_site_dir.is_dir():
+                search_dir = potential_site_dir
+                requested_site_dir_name = normalized_site_dir_name
+                print(f"✅ Normalized '{site_input}' to site directory: '{normalized_site_dir_name}'")
+
+                # Determine the specific page requested
+                path_part = parsed_url.path
+                if not path_part or path_part == "/":
+                    requested_page_slug = normalized_site_dir_name # Root page identifier
+                else:
+                    requested_page_slug = path_part.strip("/").replace("/", "_") # Sanitized subpage slug
+                    print(f"✅ Targeting specific page: '{requested_page_slug}'")
             else:
-                print(f"❌ Error: Could not find a directory for '{site_input}' or normalized name '{normalized_name}'.")
+                print(f"❌ Error: Could not find a site directory matching '{site_input}' or normalized name '{normalized_site_dir_name}'.")
                 return
 
     if not search_dir.exists():
-        print(f"❌ Error: Directory '{search_dir}' not found. Run the main script first.")
+        print(f"❌ Error: Directory '{search_dir}' not found. Ensure site data exists.")
         return
 
-    all_reports = []
-    json_files = list(search_dir.rglob('*.json'))
+    # --- Collect JSON files ---
+    all_json_paths = list(search_dir.rglob('*.json'))
 
+    # Filter JSON files based on requested_page_slug if specified
+    if requested_page_slug:
+        filtered_json_paths = []
+        for json_path in all_json_paths:
+            file_stem = json_path.stem
+            parts = file_stem.rsplit('-', 2)
+            current_page_slug = parts[0]
+            
+            if current_page_slug == requested_page_slug:
+                filtered_json_paths.append(json_path)
+        json_files = filtered_json_paths
+        
+        if not json_files:
+            print(f"🟡 Warning: No JSON files found for page '{requested_page_slug}' in '{search_dir}'. Nothing to compare.")
+            return
+    else: # If no specific page requested, use all found JSONs
+        json_files = all_json_paths
+    
     if not json_files:
         print(f"🟡 Warning: No JSON files found in '{search_dir}'. Nothing to compare.")
         return
@@ -114,7 +153,7 @@ def main():
     for path in json_files:
         try:
             # Extract metadata from path: .../<site-name>/<page-slug>-<strategy>-<timestamp>.json
-            site_name = path.parts[-2]
+            site_name = path.parts[-2] # This is the actual site_name from the dir
             file_stem = path.stem
             
             parts = file_stem.rsplit('-', 2)
@@ -154,15 +193,25 @@ def main():
     
     # --- Generate and write HTML report ---
     print("🎨 Generating HTML report...")
-    html_content = generate_html_report(grouped_reports)
+    html_content = generate_html_report(grouped_reports, args.deep_dive)
     
     # --- Prepare output directory and filename ---
     reports_dir = pathlib.Path("reports")
     reports_dir.mkdir(exist_ok=True)
     
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M")
+    current_datetime = datetime.datetime.now().strftime("%Y-%m-%d-%H%M")
     
-    report_filename = reports_dir / f"comparison-report-{site_identifier}-{timestamp}.html"
+    # Construct output filename based on what was requested
+    if requested_site_dir_name and requested_page_slug and requested_page_slug != requested_site_dir_name:
+        report_output_name_parts.append(requested_site_dir_name)
+        report_output_name_parts.append(requested_page_slug)
+    elif requested_site_dir_name: # Only site was given, implies root
+        report_output_name_parts.append(requested_site_dir_name)
+    else: # No site or page specified, so it's a full report
+        report_output_name_parts.append("all-sites")
+    
+    report_filename_base = "-".join(report_output_name_parts)
+    report_filename = reports_dir / f"comparison-report-{report_filename_base}-{current_datetime}.html"
     
     with open(report_filename, "w", encoding="utf-8") as f:
         f.write(html_content)
@@ -195,7 +244,7 @@ def format_change(change: float, metric: str) -> str:
     return f"{sign}{change:.4f}"
 
 
-def generate_html_report(grouped_data: dict) -> str:
+def generate_html_report(grouped_data: dict, deep_dive: bool = False) -> str:
     """Takes grouped data and returns a full HTML report as a string."""
     
     # --- HTML and CSS Boilerplate ---
@@ -255,7 +304,10 @@ def generate_html_report(grouped_data: dict) -> str:
         first = reports[0]
         last = reports[-1]
         
-        metrics_to_compare = ["PerfScore", "LCP_ms", "TBT_ms", "CLS"]
+        if deep_dive:
+            metrics_to_compare = ["PerfScore", "LCP_ms", "TBT_ms", "CLS"]
+        else:
+            metrics_to_compare = ["PerfScore"]
         
         for i, metric in enumerate(metrics_to_compare):
             old_val = first[metric]
@@ -282,35 +334,55 @@ def generate_html_report(grouped_data: dict) -> str:
     for site, page, strategy in sorted_keys:
         reports = grouped_data[(site, page, strategy)]
         html += f'<h2>Trend for <span class="site-name">{site}</span> (<span class="page-name">{page}</span> page, <span class="strategy">{strategy}</span>)</h2>'
-        html += """
-        <table>
-            <thead>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>Perf</th>
-                    <th>Access</th>
-                    <th>BP</th>
-                    <th>SEO</th>
-                    <th>LCP (ms)</th>
-                    <th>TBT (ms)</th>
-                    <th>CLS</th>
-                </tr>
-            </thead>
-            <tbody>
-        """
-        for report in reversed(reports): # Show newest first
-            html += f"""
-            <tr>
-                <td>{report['timestamp']}</td>
-                <td>{report['PerfScore']}</td>
-                <td>{report['AccessibilityScore']}</td>
-                <td>{report['BestPracticesScore']}</td>
-                <td>{report['SEOScore']}</td>
-                <td>{report['LCP_ms']}</td>
-                <td>{report['TBT_ms']}</td>
-                <td>{report['CLS']:.4f}</td>
-            </tr>
+        
+        if deep_dive:
+            html += """
+            <table>
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Perf</th>
+                        <th>Access</th>
+                        <th>BP</th>
+                        <th>SEO</th>
+                        <th>LCP (ms)</th>
+                        <th>TBT (ms)</th>
+                        <th>CLS</th>
+                    </tr>
+                </thead>
+                <tbody>
             """
+            for report in reversed(reports): # Show newest first
+                html += f"""
+                <tr>
+                    <td>{report['timestamp']}</td>
+                    <td>{report['PerfScore']}</td>
+                    <td>{report['AccessibilityScore']}</td>
+                    <td>{report['BestPracticesScore']}</td>
+                    <td>{report['SEOScore']}</td>
+                    <td>{report['LCP_ms']}</td>
+                    <td>{report['TBT_ms']}</td>
+                    <td>{report['CLS']:.4f}</td>
+                </tr>
+                """
+        else: # Simplified view
+            html += """
+            <table>
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Perf</th>
+                    </tr>
+                </thead>
+                <tbody>
+            """
+            for report in reversed(reports): # Show newest first
+                html += f"""
+                <tr>
+                    <td>{report['timestamp']}</td>
+                    <td>{report['PerfScore']}</td>
+                </tr>
+                """
         html += "</tbody></table>"
 
     html += "</body></html>"
