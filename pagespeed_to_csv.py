@@ -293,7 +293,7 @@ def main():
         urls.append(args.url)
         parsed_url = urlparse(args.url)
         # Generate a safe filename from the URL's domain
-        report_name_base = parsed_url.netloc.replace("www.", "").replace(".", "_")
+        report_name_base = parsed_url.netloc.replace("www.", "").replace(".", "-")
         print(f"🔎 Testing single URL: {args.url}")
     else:
         urls = load_urls(args.url_file)
