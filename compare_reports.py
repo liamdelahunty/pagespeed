@@ -156,10 +156,28 @@ def main():
             site_name = path.parts[-2] # This is the actual site_name from the dir
             file_stem = path.stem
             
-            parts = file_stem.rsplit('-', 2)
-            page_slug = parts[0]
-            strategy = parts[1]
-            timestamp = parts[2]
+            page_slug = ""
+            strategy = ""
+            timestamp = ""
+
+            if "-desktop-" in file_stem:
+                parts = file_stem.split("-desktop-", 1)
+                page_slug = parts[0]
+                strategy = "desktop"
+                timestamp = parts[1]
+            elif "-mobile-" in file_stem:
+                parts = file_stem.split("-mobile-", 1)
+                page_slug = parts[0]
+                strategy = "mobile"
+                timestamp = parts[1]
+            else:
+                # Fallback for unexpected formats, or if strategy not clearly separated
+                # This should ideally not be hit with the new naming convention
+                parts = file_stem.rsplit('-', 2)
+                page_slug = parts[0]
+                strategy = parts[1]
+                timestamp = parts[2]
+                print(f"🟡 Warning: Fallback parsing used for '{path}'. Unexpected filename format.")
 
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
