@@ -34,6 +34,7 @@ env.bak/
 # Environment variables – contains your secret API key
 .env
 .env.*
+bak/
 
 # Ignore every *.txt file
 *.txt
