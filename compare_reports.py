@@ -13,6 +13,7 @@ import pathlib
 import argparse
 import datetime
 from typing import List, Dict
+from urllib.parse import urlparse
 
 # This function is copied from pagespeed_to_csv.py to make this script standalone.
 def extract_metrics(data: dict) -> Dict[str, object]:
@@ -59,25 +60,53 @@ def main():
     parser.add_argument(
         "-s", "--site",
         type=str,
-        help="Generate a report for only a specific site (e.g., 'example-com')."
+        help="Generate a report for a specific site. Accepts a URL, domain, or the site's directory name (e.g., 'example-com')."
     )
     args = parser.parse_args()
 
     print("🔎 Starting report generation...")
     
     base_dir = pathlib.Path("debug-responses")
-    if args.site:
-        base_dir = base_dir / args.site
+    search_dir = base_dir
+    site_identifier = "all-sites" # Default for combined report
 
-    if not base_dir.exists():
-        print(f"❌ Error: Directory '{base_dir}' not found. Check the site name or run the main script first.")
+    if args.site:
+        # Normalize the input to find the correct site directory
+        site_input = args.site
+        
+        # First, check if the input is a direct directory name match
+        potential_dir = base_dir / site_input
+        if potential_dir.is_dir():
+            search_dir = potential_dir
+            site_identifier = site_input
+            print(f"✅ Found direct match for site directory: '{site_input}'")
+        else:
+            # If not, treat it as a URL/domain and normalize it
+            temp_url = site_input if "://" in site_input else f"https://{site_input}"
+            parsed_url = urlparse(temp_url)
+            
+            # Use netloc if it exists, otherwise use the original path as a fallback
+            domain_part = parsed_url.netloc or parsed_url.path
+            normalized_name = domain_part.replace("www.", "").replace(".", "-")
+            
+            potential_dir = base_dir / normalized_name
+            if potential_dir.is_dir():
+                search_dir = potential_dir
+                site_identifier = normalized_name
+                print(f"✅ Normalized '{site_input}' to site directory: '{normalized_name}'")
+            else:
+                print(f"❌ Error: Could not find a directory for '{site_input}' or normalized name '{normalized_name}'.")
+                return
+
+    if not search_dir.exists():
+        print(f"❌ Error: Directory '{search_dir}' not found. Run the main script first.")
         return
 
     all_reports = []
-    json_files = list(base_dir.rglob('*.json'))
+    json_files = list(search_dir.rglob('*.json'))
 
     if not json_files:
-        print(f"🟡 Warning: No JSON files found in '{base_dir}'. Nothing to compare.")
+        print(f"🟡 Warning: No JSON files found in '{search_dir}'. Nothing to compare.")
         return
 
     print(f"📄 Found {len(json_files)} JSON files to process.")
@@ -88,8 +117,6 @@ def main():
             site_name = path.parts[-2]
             file_stem = path.stem
             
-            # The timestamp can contain hyphens, so we can't just split by '-'.
-            # We split from the right, knowing the strategy is the second to last part.
             parts = file_stem.rsplit('-', 2)
             page_slug = parts[0]
             strategy = parts[1]
@@ -135,10 +162,7 @@ def main():
     
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M")
     
-    if args.site:
-        report_filename = reports_dir / f"comparison-report-{args.site}-{timestamp}.html"
-    else:
-        report_filename = reports_dir / f"comparison-report-{timestamp}.html"
+    report_filename = reports_dir / f"comparison-report-{site_identifier}-{timestamp}.html"
     
     with open(report_filename, "w", encoding="utf-8") as f:
         f.write(html_content)
