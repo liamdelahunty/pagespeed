@@ -84,10 +84,16 @@ def main():
 
     for path in json_files:
         try:
-            # Extract metadata from path: .../<site-name>/<strategy>-<timestamp>.json
+            # Extract metadata from path: .../<site-name>/<page-slug>-<strategy>-<timestamp>.json
             site_name = path.parts[-2]
             file_stem = path.stem
-            strategy, timestamp = file_stem.split('-', 1)
+            
+            # The timestamp can contain hyphens, so we can't just split by '-'.
+            # We split from the right, knowing the strategy is the second to last part.
+            parts = file_stem.rsplit('-', 2)
+            page_slug = parts[0]
+            strategy = parts[1]
+            timestamp = parts[2]
 
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -96,6 +102,7 @@ def main():
             
             report_data = {
                 "site": site_name,
+                "page": page_slug,
                 "strategy": strategy,
                 "timestamp": timestamp,
                 **metrics
@@ -109,7 +116,7 @@ def main():
     # --- Group reports ---
     grouped_reports = {}
     for report in all_reports:
-        key = (report["site"], report["strategy"])
+        key = (report["site"], report["page"], report["strategy"])
         if key not in grouped_reports:
             grouped_reports[key] = []
         grouped_reports[key].append(report)
@@ -185,6 +192,7 @@ def generate_html_report(grouped_data: dict) -> str:
         th { background-color: #f2f2f2; font-weight: bold; }
         tr:nth-child(even) { background-color: #f9f9f9; }
         .site-name { font-weight: bold; text-transform: capitalize; }
+        .page-name { font-family: monospace; background-color: #eee; padding: 2px 5px; border-radius: 3px; }
         .strategy { font-style: italic; }
         .change { font-weight: bold; }
         .green { color: #28a745; }
@@ -203,6 +211,7 @@ def generate_html_report(grouped_data: dict) -> str:
         <thead>
             <tr>
                 <th>Site</th>
+                <th>Page</th>
                 <th>Strategy</th>
                 <th>Metric</th>
                 <th>Oldest Value</th>
@@ -214,8 +223,8 @@ def generate_html_report(grouped_data: dict) -> str:
     """
     sorted_keys = sorted(grouped_data.keys())
 
-    for site, strategy in sorted_keys:
-        reports = grouped_data[(site, strategy)]
+    for site, page, strategy in sorted_keys:
+        reports = grouped_data[(site, page, strategy)]
         if len(reports) < 2:
             continue
         
@@ -233,6 +242,7 @@ def generate_html_report(grouped_data: dict) -> str:
             html += f"<tr>"
             if i == 0:
                 html += f'<td rowspan="{len(metrics_to_compare)}" class="site-name">{site}</td>'
+                html += f'<td rowspan="{len(metrics_to_compare)}" class="page-name">{page}</td>'
                 html += f'<td rowspan="{len(metrics_to_compare)}" class="strategy">{strategy}</td>'
             
             html += f"<td>{metric}</td>"
@@ -245,9 +255,9 @@ def generate_html_report(grouped_data: dict) -> str:
 
 
     # --- Detailed Trend Tables ---
-    for site, strategy in sorted_keys:
-        reports = grouped_data[(site, strategy)]
-        html += f'<h2>Trend for <span class="site-name">{site}</span> (<span class="strategy">{strategy}</span>)</h2>'
+    for site, page, strategy in sorted_keys:
+        reports = grouped_data[(site, page, strategy)]
+        html += f'<h2>Trend for <span class="site-name">{site}</span> (<span class="page-name">{page}</span> page, <span class="strategy">{strategy}</span>)</h2>'
         html += """
         <table>
             <thead>
