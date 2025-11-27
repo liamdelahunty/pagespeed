@@ -165,17 +165,22 @@ def call_pagespeed(url: str, strategy: str) -> dict:
 
 def dump_response(data: dict, url: str, strategy: str, timestamp: str):
     """Write the raw JSON to a readable file for debugging/storage."""
-    out_dir = pathlib.Path("debug-responses")
-    out_dir.mkdir(exist_ok=True)
+    # Create a safe directory name from the URL's domain
+    parsed_url = urlparse(url)
+    site_dir_name = parsed_url.netloc.replace("www.", "").replace(".", "-")
 
-    # Build a safe filename:
-    safe_url = url.replace("https://", "").replace("/", "-")
-    filename = out_dir / f"{safe_url}-{strategy}-{timestamp}.json"
+    # Create the nested directory structure, e.g., /debug-responses/example-com/
+    out_dir = pathlib.Path("debug-responses") / site_dir_name
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # The filename no longer needs the URL, as it's in the parent directory
+    filename = out_dir / f"{strategy}-{timestamp}.json"
 
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, sort_keys=True)
 
-    print(f"🔍 Dumped raw response to {filename}")
+    # The print statement is removed to reduce console noise
+    # print(f"🔍 Dumped raw response to {filename}")
 
 def extract_metrics(data: dict) -> Dict[str, object]:
     """
