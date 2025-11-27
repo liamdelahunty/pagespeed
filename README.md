@@ -10,7 +10,7 @@ A Python utility that:
 * Loads URLs from urls.txt (one per line).
 * Queries the API for Performance, Accessibility, Best‑Practices, SEO.
 * Retrieves FCP, Speed Index, LCP, TTI, TBT, CLS, SRT.
-* Saves a file named pagespeed-report-YYYY‑MM‑DD‑HHMM.csv.
+* Saves a file named `pagespeed-report-<source>-YYYY-MM-DD-HHMM.csv`, where `<source>` is derived from the input (e.g., the website domain or the input filename).
 * Dumps the raw JSON responses to debug-responses/ for troubleshooting.
 * All results are deterministic (no cache, no cookies, fixed throttling), making the CSV comparable across users and locations.
 
@@ -63,7 +63,7 @@ If both `--url` and `--url-file` are provided, the single URL from `--url` takes
 
 ### The script will:
 Print a progress bar (tqdm).
-Create pagespeed-report-YYYY-MM-DD-HHmm.csv (timestamp varies).
+Create a report named `pagespeed-report-<source>-<timestamp>.csv`, where `<source>` is the domain for a single URL test or the filename for a batch test.
 Save raw API responses under debug-responses/ (optional, for debugging).
 This can easily be read with the Lighthouse Viewer in the [Lighthouse Chrome Extension](https://chromewebstore.google.com/detail/lighthouse/blipmdconlkpinefehnmjammfjpmpbjk) or directly using the [Lighthouse viewer page](https://googlechrome.github.io/lighthouse/viewer/).
 
@@ -75,9 +75,8 @@ This can easily be read with the Lighthouse Viewer in the [Lighthouse Chrome Ext
 | **Strategies** | `("desktop", "mobile")` | Modify the `STRATEGIES` tuple (`STRATEGIES = ("desktop",)` for only desktop, etc.). |
 | **Categories** | All four – `performance, accessibility, best‑practices, seo` | Change the `category` list inside `call_pagespeed` if you need a subset. |
 | **Timeout** | `90` seconds | Adjust the `timeout=` argument in `requests.get(...)`. |
-| **Output folder** | CSV written to the repository root (or `reports/` if you applied the folder change) | Update `OUTPUT_CSV` (or `REPORTS_DIR`) constants. |
-| **Debug JSON dump folder** | `debug-responses/` (or `reports/debug-responses/` after folder change) | Change the `out_dir` path inside `dump_response`. |
-| **Timestamp format** | `YYYY‑MM‑DD‑HHMM` (e.g., `2025-10-15-1432`) | Edit the `strftime` pattern in `TIMESTAMP = datetime.datetime.now().strftime("%Y-%m-%d-%H%M")`. |
+| **Output folder** | CSVs are written to the `reports/` directory. | The output directory is defined by the `REPORTS_DIR` constant in the script. The filename is generated dynamically. |
+| **Debug JSON dump folder** | `debug-responses/` | Change the `out_dir` path inside `dump_response`. |
 
 ---
 

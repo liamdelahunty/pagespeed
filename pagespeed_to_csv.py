@@ -100,6 +100,7 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 import argparse
 from typing import List, Dict
+from urllib.parse import urlparse
 from pathlib import Path
 
 # -------------------------------------------------
@@ -117,8 +118,6 @@ if not API_KEY:
     raise RuntimeError("PSI_API_KEY not found - check your .env file.")
 
 API_ENDPOINT = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
-TIMESTAMP = datetime.datetime.now().strftime("%Y-%m-%d-%H%M")
-OUTPUT_CSV = REPORTS_DIR / f"pagespeed-report-{TIMESTAMP}.csv"
 
 
 # Strategies we want to query - keep both unless you deliberately want only one.
@@ -164,14 +163,14 @@ def call_pagespeed(url: str, strategy: str) -> dict:
     except requests.RequestException as exc:
         raise RuntimeError(f"Request failed for {url} ({strategy}): {exc}") from exc
 
-def dump_response(data: dict, url: str, strategy: str):
+def dump_response(data: dict, url: str, strategy: str, timestamp: str):
     """Write the raw JSON to a readable file for debugging/storage."""
     out_dir = pathlib.Path("debug-responses")
     out_dir.mkdir(exist_ok=True)
 
     # Build a safe filename:
     safe_url = url.replace("https://", "").replace("/", "-")
-    filename = out_dir / f"{safe_url}-{strategy}-{TIMESTAMP}.json"
+    filename = out_dir / f"{safe_url}-{strategy}-{timestamp}.json"
 
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, sort_keys=True)
@@ -288,28 +287,38 @@ def main():
         sys.exit(1)
 
     urls: List[str] = []
+    report_name_base = ""
+
     if args.url:
         urls.append(args.url)
+        parsed_url = urlparse(args.url)
+        # Generate a safe filename from the URL's domain
+        report_name_base = parsed_url.netloc.replace("www.", "").replace(".", "_")
         print(f"🔎 Testing single URL: {args.url}")
     else:
         urls = load_urls(args.url_file)
+        report_name_base = Path(args.url_file).stem
         print(f"🔎 Using URL file: {args.url_file}")
 
     if not urls:
         print("[ERROR] No URLs provided for testing. Exiting.", file=sys.stderr)
         sys.exit(1)
 
+    # Generate timestamp and output filename
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M")
+    output_csv = REPORTS_DIR / f"pagespeed-report-{report_name_base}-{timestamp}.csv"
+
     total_requests = len(urls) * len(STRATEGIES)
 
     print(f"🔎 Running PageSpeed Insights for {len(urls)} URLs ({total_requests} requests total)")
-    write_csv_header(OUTPUT_CSV)
+    write_csv_header(output_csv)
 
     # Progress bar over the Cartesian product of URLs × strategies
     for url in tqdm(urls, desc="URLs", unit="url"):
         for strat in STRATEGIES:
             try:
                 data = call_pagespeed(url, strat)
-                dump_response(data, url, strat)   
+                dump_response(data, url, strat, timestamp)
                 metrics = extract_metrics(data)
 
                 # Build the CSV row - order must match the header defined above
@@ -332,7 +341,7 @@ def main():
                     "",                         # Notes - you can fill manually later
                 ]
 
-                append_row(OUTPUT_CSV, csv_row)
+                append_row(output_csv, csv_row)
 
             except Exception as e:
                 tqdm.write(f"[WARN] {url} ({strat}) → {e}")
@@ -342,13 +351,13 @@ def main():
                     url,
                     "Desktop" if strat == "desktop" else "Mobile",
                     strat,
-                    "", "", "", "", "",   # five score columns left blank
-                    "", "", "", "", "", "", "", "",  # performance metric columns blank
+                    "", "", "", "",  # 4 score columns
+                    "", "", "", "", "", "", "", # 7 metric columns
                     f"ERROR: {e}"        # put the error message in the Notes column
                 ]
-                append_row(OUTPUT_CSV, empty_row)
+                append_row(output_csv, empty_row)
 
-    print(f"\n✅ Finished. Results saved to '{OUTPUT_CSV}'.")
+    print(f"\n✅ Finished. Results saved to '{output_csv}'.")
     print("Happy analysing!")
 
 if __name__ == "__main__":
