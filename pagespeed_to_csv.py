@@ -268,7 +268,22 @@ def append_row(csv_path: str, row: List[object]):
 # ----------------------------------------------------------------------
 def main():
     parser = argparse.ArgumentParser(
-        description="Collect PageSpeed Insights data for one or more URLs and save the results to a CSV file.",
+        description="""
+---------------------------------------------------------
+         PageSpeed Insights Data Collection Script       
+---------------------------------------------------------
+
+Purpose: This script collects Google PageSpeed Insights
+         and Lighthouse data for a list of URLs and then
+         dumps the results into a CSV file.             
+
+GitHub Repo: https://github.com/liamdelahunty/pagespeed
+Author: Liam Victor Delahunty
+Contact: liam.delahunty_at_croneri.co.uk
+---------------------------------------------------------
+
+Collect PageSpeed Insights data for one or more URLs and save the results to a CSV file.
+""",
         epilog=(
             "Examples:\n"
             "  # Test a single URL\n"
@@ -292,17 +307,6 @@ def main():
         help="A single URL to test. If provided, --url-file will be ignored."
     )
     args = parser.parse_args()
-
-    print("---------------------------------------------------------")
-    print("         PageSpeed Insights Data Collection Script       ")
-    print("---------------------------------------------------------")
-    print("\nPurpose: This script collects Google PageSpeed Insights")
-    print("         and Lighthouse data for a list of URLs and then")
-    print("         dumps the results into a CSV file.             ")
-    print("\nGitHub Repo: https://github.com/liamdelahunty/pagespeed") # TODO: Get GitHub repo link
-    print("Author: Liam Victor Delahunty")
-    print("Contact: liam.delahunty_at_croneri.co.uk") # TODO: Get Contact Info
-    print("---------------------------------------------------------")
 
     if not API_KEY:
         print("[ERROR] Please set the PSI_API_KEY environment variable.", file=sys.stderr)
