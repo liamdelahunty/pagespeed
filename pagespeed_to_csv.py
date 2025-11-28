@@ -318,6 +318,7 @@ Contact: liam.delahunty (at) croneri.co.uk
 
     urls: List[str] = []
     report_name_base = ""
+    failed_requests = []
 
     if args.url:
         url_to_test = args.url
@@ -380,6 +381,8 @@ Contact: liam.delahunty (at) croneri.co.uk
 
             except Exception as e:
                 tqdm.write(f"[WARN] {url} ({strat}) → {e}")
+                # Add the failed request to the list for a retry attempt
+                failed_requests.append((url, strat))
                 # Write a row with empty scores so you can see which combos failed
                 empty_row = [
                     time.strftime("%Y-%m-%d %H:%M"),
@@ -391,6 +394,41 @@ Contact: liam.delahunty (at) croneri.co.uk
                     f"ERROR: {e}"        # put the error message in the Notes column
                 ]
                 append_row(output_csv, empty_row)
+
+    # Retry failed requests once
+    if failed_requests:
+        print(f"\nRetrying {len(failed_requests)} failed requests...")
+        for url, strat in failed_requests:
+            try:
+                print(f"Retrying {url} ({strat})...")
+                data = call_pagespeed(url, strat)
+                dump_response(data, url, strat, timestamp)
+                metrics = extract_metrics(data)
+
+                # Build the CSV row - order must match the header defined above
+                csv_row = [
+                    time.strftime("%Y-%m-%d %H:%M"),   # Date
+                    url,
+                    "Desktop" if strat == "desktop" else "Mobile",
+                    strat,
+                    metrics["PerformanceScore"],
+                    metrics["AccessibilityScore"],
+                    metrics["BestPracticesScore"],
+                    metrics["SEOScore"],
+                    metrics["FCP_ms"],
+                    metrics["SpeedIndex_ms"],
+                    metrics["LCP_ms"],
+                    metrics["TTI_ms"],
+                    metrics["TBT_ms"],
+                    metrics["CLS"],
+                    metrics["SRT_ms"],
+                    "RETRY",                         # Notes - you can fill manually later
+                ]
+
+                append_row(output_csv, csv_row)
+
+            except Exception as e:
+                tqdm.write(f"[ERROR] Retry failed for {url} ({strat}) → {e}")
 
     print(f"\n✅ Finished. Results saved to '{output_csv}'.")
     print("Happy analysing!")
