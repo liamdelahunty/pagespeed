@@ -48,8 +48,8 @@ py -m pip install requests tqdm python-dotenv
 #4 Save it in a .env file (same folder as the script):
 echo "PSI_API_KEY=YOUR_KEY" > .env
 
-#5  Add URLs to urls.txt (one per line)
-echo "https://www.croneri.co.uk" > urls.txt
+#5  Add URLs to a file within the `url-lists` directory (e.g., `url-lists/urls.txt`)
+echo "https://www.croneri.co.uk" > url-lists/urls.txt
 
 #6 Run the collector
 python pagespeed_to_csv.py or run the code in Python IDLE or VS Code.
@@ -283,8 +283,8 @@ def main():
     parser.add_argument(
         "-f", "--url-file",
         type=str,
-        default="url_lists/urls.txt", # Default value now handled by argparse directly
-        help="Path to a file containing a list of URLs (one per line). Defaults to 'url_lists/urls.txt'."
+        default="url-lists/urls.txt", # Default value now handled by argparse directly
+        help="Path to a file containing a list of URLs (one per line). Defaults to 'url-lists/urls.txt'."
     )
     parser.add_argument(
         "-u", "--url",

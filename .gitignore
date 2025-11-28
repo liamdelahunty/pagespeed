@@ -37,7 +37,7 @@ env.bak/
 bak/
 
 # Ad-hoc URL lists
-url_lists/
+url-lists/
 
 # Ignore all text files...
 *.txt
