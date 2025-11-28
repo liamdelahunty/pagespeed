@@ -293,6 +293,17 @@ def main():
     )
     args = parser.parse_args()
 
+    print("---------------------------------------------------------")
+    print("         PageSpeed Insights Data Collection Script       ")
+    print("---------------------------------------------------------")
+    print("\nPurpose: This script collects Google PageSpeed Insights")
+    print("         and Lighthouse data for a list of URLs and then")
+    print("         dumps the results into a CSV file.             ")
+    print("\nGitHub Repo: [Insert GitHub Repo Link Here]") # TODO: Get GitHub repo link
+    print("Author: Liam Victor Delahunty")
+    print("Contact: [Insert Contact Info Here]") # TODO: Get Contact Info
+    print("---------------------------------------------------------")
+
     if not API_KEY:
         print("[ERROR] Please set the PSI_API_KEY environment variable.", file=sys.stderr)
         sys.exit(1)
