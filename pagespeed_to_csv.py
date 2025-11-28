@@ -129,14 +129,18 @@ STRATEGIES = ("desktop", "mobile")
 # ----------------------------------------------------------------------
 def load_urls(path: str) -> List[str]:
     """Read URLs from a file, one per line, stripping whitespace."""
-    if not Path(path).exists():
-        print(f"[ERROR] URL file '{path}' not found.", file=sys.stderr)
-        sys.exit(1)
+    file_path = Path(path)
+    if not file_path.exists():
+        # If the file is not found, check inside the 'url-lists' directory
+        file_path = Path("url-lists") / path
+        if not file_path.exists():
+            print(f"[ERROR] URL file '{path}' not found in the root or in the 'url-lists' directory.", file=sys.stderr)
+            sys.exit(1)
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         urls = [line.strip() for line in f.readlines() if line.strip()]
     if not urls:
-        print("[ERROR] No URLs found in the file.", file=sys.stderr)
+        print(f"[ERROR] No URLs found in the file: {file_path}", file=sys.stderr)
         sys.exit(1)
     return urls
 
