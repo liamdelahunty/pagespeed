@@ -36,6 +36,16 @@ env.bak/
 .env.*
 bak/
 
+# Ad-hoc URL lists
+url_lists/
+
+# Ignore all text files...
+*.txt
+# ...but re-include the important ones
+!requirements.txt
+!how-to-python.txt
+!urls.example.txt
+
 # Debug / raw API responses (large JSON dumps you probably don’t want in Git)
 debug-responses/
 

@@ -283,8 +283,8 @@ def main():
     parser.add_argument(
         "-f", "--url-file",
         type=str,
-        default="urls.txt", # Default value now handled by argparse directly
-        help="Path to a file containing a list of URLs (one per line). Defaults to 'urls.txt'."
+        default="url_lists/urls.txt", # Default value now handled by argparse directly
+        help="Path to a file containing a list of URLs (one per line). Defaults to 'url_lists/urls.txt'."
     )
     parser.add_argument(
         "-u", "--url",
