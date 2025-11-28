@@ -299,9 +299,9 @@ def main():
     print("\nPurpose: This script collects Google PageSpeed Insights")
     print("         and Lighthouse data for a list of URLs and then")
     print("         dumps the results into a CSV file.             ")
-    print("\nGitHub Repo: [Insert GitHub Repo Link Here]") # TODO: Get GitHub repo link
+    print("\nGitHub Repo: https://github.com/liamdelahunty/pagespeed") # TODO: Get GitHub repo link
     print("Author: Liam Victor Delahunty")
-    print("Contact: [Insert Contact Info Here]") # TODO: Get Contact Info
+    print("Contact: liam.delahunty_at_croneri.co.uk") # TODO: Get Contact Info
     print("---------------------------------------------------------")
 
     if not API_KEY:
