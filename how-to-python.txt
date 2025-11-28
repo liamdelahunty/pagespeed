@@ -1,0 +1,28 @@
+How to run
+----------
+#1 Install Python 3.8+ & upgrade pip
+py -m pip install --upgrade pip
+
+#2  Install required packages
+py -m pip install requests tqdm python-dotenv
+
+#3 Create a Google Cloud API key with the PageSpeed Insights API enabled.
+
+#4 Save it in a .env file (same folder as the script):
+echo "PSI_API_KEY=YOUR_KEY" > .env
+
+#5  Add URLs to urls.txt (one per line)
+echo "https://www.croneri.co.uk" > urls.txt
+
+#6 Run the collector
+py pagespeed_to_csv.py or run the code in Python IDLE or VS Code.
+
+IDLE
+Choose *File → Open… (Ctrl+O).
+Navigate to the location of your .py file, select it, and click Open. The script loads into the editor window.
+Press F5 (or Run → Run Module) to execute.
+
+If using the virtual environment, activate the environment first:
+source .venv/Scripts/activate
+Then, run your script using the python command:
+python pagespeed_to_csv.py

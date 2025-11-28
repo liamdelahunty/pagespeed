@@ -36,18 +36,11 @@ env.bak/
 .env.*
 bak/
 
-# Ignore every *.txt file
-*.txt
-# …but keep the example
-!urls.example.txt
-
 # Debug / raw API responses (large JSON dumps you probably don’t want in Git)
 debug-responses/
-debug‑responses/**
 
 # The ongoing reports
 reports/
-reports/**
 
 # Generated CSV reports – they are reproducible from the script
 pagespeed‑report-*.csv
@@ -58,7 +51,6 @@ pagespeed‑report-*.xlsx   # (if you export to Excel)
 # ──────────────────────────────────────────────────────────────
 # macOS Finder metadata
 .DS_Store
-.DS_Store?
 
 # Windows thumbnail cache
 Thumbs.db
@@ -88,12 +80,10 @@ Thumbs.db
 *.log
 *.o
 *.rar
-*.so
 *.sql
 *.sqlite
 *.tar
 *.tmp
-*.xlsx
 *.zip
 ._*
 /temp
