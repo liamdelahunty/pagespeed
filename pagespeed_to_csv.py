@@ -301,11 +301,14 @@ def main():
     report_name_base = ""
 
     if args.url:
-        urls.append(args.url)
-        parsed_url = urlparse(args.url)
+        url_to_test = args.url
+        if not url_to_test.startswith(('http://', 'https://')):
+            url_to_test = 'https://' + url_to_test
+        urls.append(url_to_test)
+        parsed_url = urlparse(url_to_test)
         # Generate a safe filename from the URL's domain
         report_name_base = parsed_url.netloc.replace("www.", "").replace(".", "-")
-        print(f"🔎 Testing single URL: {args.url}")
+        print(f"🔎 Testing single URL: {url_to_test}")
     else:
         urls = load_urls(args.url_file)
         report_name_base = Path(args.url_file).stem
