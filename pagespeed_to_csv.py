@@ -279,19 +279,19 @@ Purpose: This script collects Google PageSpeed Insights
 
 GitHub Repo: https://github.com/liamdelahunty/pagespeed
 Author: Liam Victor Delahunty
-Contact: liam.delahunty_at_croneri.co.uk
+Contact: liam.delahunty (at) croneri.co.uk
 ---------------------------------------------------------
 
-Collect PageSpeed Insights data for one or more URLs and save the results to a CSV file.
 """,
         epilog=(
             "Examples:\n"
             "  # Test a single URL\n"
             "  python pagespeed_to_csv.py -u https://www.example.com\n\n"
-            "  # Test all URLs from a file named 'custom_urls.txt'\n"
-            "  python pagespeed_to_csv.py -f custom_urls.txt\n\n"
+            "  # Test all URLs from a file named 'custom-urls.txt'\n"
+            "  python pagespeed_to_csv.py -f custom-urls.txt\n\n"
             "  # Show this help message\n"
-            "  python pagespeed_to_csv.py --help"
+            "  python pagespeed_to_csv.py --help\n\n"
+            "---------------------------------------------------------"
         ),
         formatter_class=argparse.RawTextHelpFormatter  # Keeps epilog formatting
     )
@@ -342,9 +342,11 @@ Collect PageSpeed Insights data for one or more URLs and save the results to a C
     print(f"🔎 Running PageSpeed Insights for {len(urls)} URLs ({total_requests} requests total)")
     write_csv_header(output_csv)
 
-    # Progress bar over the Cartesian product of URLs × strategies
-    for url in tqdm(urls, desc="URLs", unit="url"):
-        for strat in STRATEGIES:
+    # Iterate over each URL
+    for url in urls:
+        print(f"\nProcessing URL: {url}")
+        # Create a progress bar for the strategies (desktop, mobile)
+        for strat in tqdm(STRATEGIES, desc="Strategies", unit="strat"):
             try:
                 data = call_pagespeed(url, strat)
                 dump_response(data, url, strat, timestamp)
