@@ -365,6 +365,7 @@ def generate_html_report(grouped_data: dict, deep_dive: bool = False) -> str:
 </head>
 <body>
     <h1>PageSpeed Insights Comparison Report</h1>
+    <p>Generated from <a href="https://github.com/liamdelahunty/pagespeed" target="_blank">liamdelahunty/pagespeed</a></p>
     """
 
     # --- Summary Table ---
