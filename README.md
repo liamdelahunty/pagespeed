@@ -87,6 +87,33 @@ python compare_reports.py -s example-com
 ```
 This will generate a `comparison-report-example-com-<timestamp>.html` file.
 
+## 🧹 Organising Raw Reports
+
+The `organise_reports.py` script helps to standardise the filenames of the raw JSON responses stored in the `debug-responses/` directory. This is particularly useful if your JSON files were generated with older naming conventions or if you want to ensure consistent naming for easier analysis.
+
+The script renames files to the following format: `<page-slug>-<strategy>-<timestamp>.json`. It extracts the page URL, strategy (mobile/desktop), and fetch timestamp directly from the JSON content to ensure accuracy.
+
+### How to run
+
+To run the organisation script, execute the following command:
+
+```sh
+python organise_reports.py
+```
+
+The script will automatically scan all JSON files in `debug-responses/` and rename them in place. It will report on any files that were renamed or skipped.
+
+```
+Found X JSON files to process. Starting renaming...
+✅ Renamed 'old-filename-mobile-timestamp.json' -> 'example-com-mobile-2023-10-27-103000.json'
+🟡 Skipping 'already-correctly-named.json': a file named 'already-correctly-named.json' already exists.
+--- Organisation Complete ---
+Renamed: Y files
+Skipped: Z files
+```
+
+**Note:** It's recommended to back up your `debug-responses/` directory before running this script, although the script has been designed to avoid overwriting files.
+
 ## 📋 Configuration Notes  
 
 | Setting | Default | How to change |
