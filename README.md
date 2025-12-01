@@ -73,19 +73,48 @@ If both `--url` and `--url-file` are provided, the single URL from `--url` takes
 This can easily be read with the Lighthouse Viewer in the [Lighthouse Chrome Extension](https://chromewebstore.google.com/detail/lighthouse/blipmdconlkpinefehnmjammfjpmpbjk) or directly using the [Lighthouse viewer page](https://googlechrome.github.io/lighthouse/viewer/).
 
 ## 📊 Comparing Reports
-This project also includes a `compare_reports.py` script that generates an HTML report to show performance trends over time.
+The `compare_reports.py` script scans the raw JSON data in `debug-responses/` and generates a single, self-contained HTML report to show performance trends over time.
 
-### How to run
+### Usage
+The script offers several flags to filter the data included in the report.
+
+**1. Generate a full report (all sites)**
 ```sh
 python compare_reports.py
 ```
 This will generate a `comparison-report-all-sites-<timestamp>.html` file in the `reports/` directory.
 
-You can also specify a single site to report on:
+**2. Filter for a specific host**
+Use the `-H` or `--host` flag to report on all pages for a specific website.
 ```sh
-python compare_reports.py -s example-com
+python compare_reports.py --host www.croneri.co.uk
 ```
-This will generate a `comparison-report-example-com-<timestamp>.html` file.
+
+**3. Filter for a specific URL**
+Use the `-u` or `--url` flag to report on a single page.
+```sh
+python compare_reports.py --url https://www.croneri.co.uk/products
+```
+
+**4. Filter by Strategy**
+Add the `--strategy` flag to any command to limit the report to either `mobile` or `desktop` data.
+```sh
+python compare_reports.py --host www.croneri.co.uk --strategy mobile
+```
+
+**5. Show More Metrics**
+Add the `-d` or `--deep-dive` flag to include all core web vitals and other performance metrics in the tables. By default, only the main Performance Score is shown.
+```sh
+python compare_reports.py --url https://www.croneri.co.uk -d
+```
+
+### Output Report
+The generated HTML report contains two main sections:
+
+*   **Summary of Changes:** A high-level overview comparing the very first and very last report found for a given page, showing the change in score.
+*   **Detailed Trend Analysis:** A set of horizontal tables, one for each URL. These tables provide a detailed, time-based view of performance.
+    *   **Smart Headers:** To save space, timestamps are grouped. The top header row shows the Date (and spans across multiple tests from the same day), while the second row shows the Time.
+    *   **Grouped Columns:** Mobile and Desktop tests run within two minutes of each other are grouped into a single column, making it easy to compare results from the same test run.
 
 ## 🧹 Organising Raw Reports
 
