@@ -115,13 +115,20 @@ Add the `-d` or `--deep-dive` flag to include all core web vitals and other perf
 python compare_reports.py --url https://www.croneri.co.uk -d
 ```
 
+**7. Include Trend Graphs**
+Add the `--with-graphs` flag to any command to include interactive line charts in the report. These charts visualize the trend of selected metrics over time for each URL.
+```sh
+python compare_reports.py --url https://www.croneri.co.uk --with-graphs
+```
+
 ### Output Report
-The generated HTML report contains two main sections:
+The generated HTML report contains two main sections, plus an optional section for graphs:
 
 *   **Summary of Changes:** A high-level overview comparing the very first and very last report found for a given page, showing the change in score.
 *   **Detailed Trend Analysis:** A set of horizontal tables, one for each URL. These tables provide a detailed, time-based view of performance.
     *   **Smart Headers:** To save space, timestamps are grouped. The top header row shows the Date (and spans across multiple tests from the same day), while the second row shows the Time.
     *   **Grouped Columns:** Mobile and Desktop tests run within two minutes of each other are grouped into a single column, making it easy to compare results from the same test run.
+*   **Trend Graphs (Optional):** If the `--with-graphs` flag is used, interactive line charts are generated for each URL and metric, showing performance trends over time for both mobile and desktop strategies.
 
 ## 🧹 Organising Raw Reports
 

@@ -145,6 +145,11 @@ def main():
         action="store_true",
         help="Include all performance metrics (LCP, TBT, CLS, etc.) in the report. By default, only the Performance Score is shown."
     )
+    parser.add_argument(
+        "--with-graphs",
+        action="store_true",
+        help="Include interactive charts in the HTML report."
+    )
     args = parser.parse_args()
 
     print("🔎 Starting report generation...")
@@ -339,7 +344,7 @@ def main():
     
     # --- Generate and write HTML report ---
     print("🎨 Generating HTML report...")
-    html_content = generate_html_report(grouped_reports, args.deep_dive)
+    html_content = generate_html_report(grouped_reports, args.deep_dive, args.with_graphs)
     
     # --- Prepare output directory and filename ---
     reports_dir = pathlib.Path("reports")
@@ -382,7 +387,7 @@ def format_change(change: float, metric: str) -> str:
     return f"{sign}{change:.4f}"
 
 
-def generate_html_report(grouped_data: dict, deep_dive: bool = False) -> str:
+def generate_html_report(grouped_data: dict, deep_dive: bool = False, with_graphs: bool = False) -> str:
     """Takes grouped data and returns a full HTML report as a string."""
     
     # --- HTML and CSS Boilerplate ---
@@ -392,12 +397,19 @@ def generate_html_report(grouped_data: dict, deep_dive: bool = False) -> str:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PageSpeed Insights Comparison Report</title>
+    <title>PageSpeed Insights Comparison Report</title>"""
+    
+    if with_graphs:
+        html += """
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>"""
+
+    html += """
     <style>
         body { font-family: sans-serif; margin: 2rem; background-color: #f9f9f9; color: #333; }
-        h1, h2 { color: #111; border-bottom: 2px solid #eee; padding-bottom: 0.5rem; }
+        h1, h2, h3 { color: #111; border-bottom: 2px solid #eee; padding-bottom: 0.5rem; }
         h1 { font-size: 2rem; }
         h2 { font-size: 1.5rem; margin-top: 3rem; }
+        h3 { font-size: 1.2rem; margin-top: 2.5rem; border-bottom-style: dashed; }
         table { border-collapse: collapse; width: 100%; margin-top: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06); background: white; }
         th, td { border: 1px solid #ddd; padding: 0.75rem; text-align: left; }
         th { background-color: #f2f2f2; font-weight: bold; }
@@ -409,6 +421,7 @@ def generate_html_report(grouped_data: dict, deep_dive: bool = False) -> str:
         .green { color: #28a745; }
         .red { color: #dc3545; }
         .gray { color: #6c757d; }
+        .chart-container { margin-top: 2rem; }
     </style>
 </head>
 <body>
@@ -484,6 +497,7 @@ def generate_html_report(grouped_data: dict, deep_dive: bool = False) -> str:
             url_groups[url_key] = {
                 "display_host": reports[0].get("display_host", site),
                 "display_page": reports[0].get("display_page", page),
+                "page_slug": page
             }
         url_groups[url_key][strategy] = reports
     
@@ -492,9 +506,12 @@ def generate_html_report(grouped_data: dict, deep_dive: bool = False) -> str:
     else:
         metrics_to_show = ["PerfScore"]
 
-    for url_key, strategies_data in url_groups.items():
+    chart_data_all_urls = {}
+
+    for url_key, strategies_data in sorted(url_groups.items()):
         display_host = strategies_data["display_host"]
         display_page = strategies_data["display_page"]
+        page_slug = strategies_data["page_slug"]
         html += f'<h3><span class="site-name">{display_host}</span> (<span class="page-name">{display_page}</span>)</h3>'
         
         all_timestamps_str = set()
@@ -508,6 +525,12 @@ def generate_html_report(grouped_data: dict, deep_dive: bool = False) -> str:
             
         grouped_timestamps = group_timestamps(list(all_timestamps_str))
         grouped_timestamps.sort(key=lambda x: x[0], reverse=True) # Sort groups by newest first
+
+        # Chart data for this specific URL
+        chart_data_this_url = {
+            "labels": [rep_ts.strftime("%Y-%m-%d %H:%M") for rep_ts, _ in reversed(grouped_timestamps)],
+            "datasets": {}
+        }
 
         # Start table and build multi-level header
         html += '<table><thead>'
@@ -545,20 +568,91 @@ def generate_html_report(grouped_data: dict, deep_dive: bool = False) -> str:
 
                 html += f"<tr><td>{metric}</td><td>{strategy}</td>"
                 
+                # Data for chart
+                dataset_key = f"{metric}-{strategy}"
+                if with_graphs:
+                    chart_data_this_url["datasets"][dataset_key] = {
+                        "label": f"{metric} ({strategy})",
+                        "data": [],
+                        "borderColor": 'blue' if strategy == 'desktop' else 'red',
+                        "fill": False
+                    }
+
+                # Iterate through sorted timestamps for the table and chart
                 for _, original_ts_strs in grouped_timestamps:
                     found_value = None
                     for ts in original_ts_strs:
                         value = reports_map.get(ts, {}).get(metric)
                         if value is not None:
                             found_value = value
-                            break # Found the first available value in the group
+                            break
                     
                     display_value = found_value if found_value is not None else "N/A"
                     html += f"<td>{display_value}</td>"
                 
-                html += "</tr>"
-        
+                if with_graphs:
+                    # For charts, we need to iterate in chronological order
+                    for rep_ts, original_ts_strs in reversed(grouped_timestamps):
+                        found_value = None
+                        for ts in original_ts_strs:
+                            value = reports_map.get(ts, {}).get(metric)
+                            if value is not None:
+                                found_value = value
+                                break
+                        chart_data_this_url["datasets"][dataset_key]["data"].append(found_value)
+
+
         html += "</tbody></table>"
+
+        if with_graphs:
+            chart_data_all_urls[page_slug] = chart_data_this_url
+            html += f"<h4>Trend Charts</h4>"
+            for metric in metrics_to_show:
+                html += f'<div class="chart-container"><canvas id="chart-{page_slug}-{metric}" height="100"></canvas></div>'
+
+    if with_graphs:
+        html += f"""
+<script>
+document.addEventListener('DOMContentLoaded', () => {{
+    const allChartData = {json.dumps(chart_data_all_urls)};
+    const metricsToShow = {json.dumps(metrics_to_show)};
+
+    for (const pageSlug in allChartData) {{
+        const urlChartData = allChartData[pageSlug];
+        
+        for (const metric of metricsToShow) {{
+            const datasets = [];
+            const mobileDataset = urlChartData.datasets[metric + '-mobile'];
+            const desktopDataset = urlChartData.datasets[metric + '-desktop'];
+
+            if (mobileDataset) datasets.push(mobileDataset);
+            if (desktopDataset) datasets.push(desktopDataset);
+
+            if (datasets.length > 0) {{
+                const ctx = document.getElementById(`chart-${{pageSlug}}-${{metric}}`).getContext('2d');
+                new Chart(ctx, {{
+                    type: 'line',
+                    data: {{
+                        labels: urlChartData.labels,
+                        datasets: datasets
+                    }},
+                    options: {{
+                        responsive: true,
+                        plugins: {{
+                            legend: {{ position: 'top' }},
+                            title: {{ display: true, text: `${{metric}} Trend` }}
+                        }},
+                        scales: {{
+                            y: {{ beginAtZero: false }}
+                        }}
+                    }}
+                }});
+            }}
+        }}
+    }}
+}});
+</script>
+"""
 
     html += "</body></html>"
     return html
