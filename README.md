@@ -96,13 +96,20 @@ Use the `-u` or `--url` flag to report on a single page.
 python compare_reports.py --url https://www.croneri.co.uk/products
 ```
 
-**4. Filter by Strategy**
+**4. Filter from a URL List File**
+Use the `-f` or `--from-file` flag to report on a specific list of URLs contained in a file. This is useful for creating a report for a subset of pages across different sites. If you provide a filename without a path, the script automatically looks for it in the `url-lists/` directory.
+```sh
+# This will use 'url-lists/my-report-list.txt'
+python compare_reports.py --from-file my-report-list.txt
+```
+
+**5. Filter by Strategy**
 Add the `--strategy` flag to any command to limit the report to either `mobile` or `desktop` data.
 ```sh
 python compare_reports.py --host www.croneri.co.uk --strategy mobile
 ```
 
-**5. Show More Metrics**
+**6. Show More Metrics**
 Add the `-d` or `--deep-dive` flag to include all core web vitals and other performance metrics in the tables. By default, only the main Performance Score is shown.
 ```sh
 python compare_reports.py --url https://www.croneri.co.uk -d

@@ -128,6 +128,12 @@ def main():
         type=str,
         help="Generate a report for all pages on a specific host. Accepts a domain or the site's directory name."
     )
+    group.add_argument(
+        "-f", "--from-file",
+        dest="url_file",
+        type=str,
+        help="Generate a report for all URLs listed in a given file."
+    )
     parser.add_argument(
         "--strategy",
         type=str,
@@ -144,77 +150,119 @@ def main():
     print("🔎 Starting report generation...")
     
     base_dir = pathlib.Path("debug-responses")
-    search_dir = base_dir
     report_output_name_parts = []
-
     all_reports = []
     json_files = []
     
-    requested_page_slug = None
+    # --- Collect JSON files based on input ---
+    if args.url_file:
+        url_list_path = pathlib.Path(args.url_file)
+        # If the filename is provided without a directory path, assume it's in the 'url-lists' directory.
+        if url_list_path.parent == pathlib.Path('.'):
+            url_list_path = pathlib.Path("url-lists") / url_list_path
 
-    if args.url:
-        url_input = args.url if "://" in args.url else f"https://{args.url}"
-        parsed_url = urlparse(url_input)
+        if not url_list_path.is_file():
+            print(f"❌ Error: URL file not found at '{url_list_path}'")
+            return
+
+        report_output_name_parts.append(f"from-{url_list_path.stem}")
+        print(f"📄 Reading URLs from '{url_list_path}'...")
         
-        host_part = parsed_url.netloc
-        normalized_host_dir = host_part.replace("www.", "").replace(".", "-")
-        
-        potential_site_dir = base_dir / normalized_host_dir
-        if potential_site_dir.is_dir():
-            search_dir = potential_site_dir
-            report_output_name_parts.append(normalized_host_dir)
-            print(f"✅ Normalized URL's host to site directory: '{normalized_host_dir}'")
+        with open(url_list_path, "r", encoding="utf-8") as f:
+            urls = [line.strip() for line in f if line.strip()]
+
+        for url in urls:
+            url_input = url if "://" in url else f"https://{url}"
+            parsed_url = urlparse(url_input)
+            
+            host_part = parsed_url.netloc
+            normalized_host_dir = host_part.replace("www.", "").replace(".", "-")
+            
+            potential_site_dir = base_dir / normalized_host_dir
+            if not potential_site_dir.is_dir():
+                print(f"🟡 Warning: Could not find site directory for host '{host_part}' (tried '{normalized_host_dir}'). Skipping URL: {url}")
+                continue
 
             path_part = parsed_url.path
             if not path_part or path_part == "/":
                 requested_page_slug = normalized_host_dir
             else:
                 requested_page_slug = path_part.strip("/").replace("/", "_")
+
+            all_json_in_site_dir = list(potential_site_dir.rglob('*.json'))
+            files_for_this_url = [p for p in all_json_in_site_dir if get_page_slug_from_path(p) == requested_page_slug]
             
-            report_output_name_parts.append(requested_page_slug)
-            print(f"✅ Targeting specific page with slug: '{requested_page_slug}'")
-        else:
-            print(f"❌ Error: Could not find a site directory for host '{host_part}' (tried '{normalized_host_dir}').")
-            return
-
-    elif args.host:
-        host_input = args.host
-        normalized_host_dir = host_input.replace("www.", "").replace(".", "-")
+            if not files_for_this_url:
+                print(f"🟡 Warning: No JSON files found for page '{requested_page_slug}' in '{potential_site_dir}'. URL: {url}")
+            
+            json_files.extend(files_for_this_url)
         
-        potential_site_dir = base_dir / normalized_host_dir
-        if potential_site_dir.is_dir():
-            search_dir = potential_site_dir
-            report_output_name_parts.append(normalized_host_dir)
-            print(f"✅ Found site directory for host: '{normalized_host_dir}'")
-        else:
-            print(f"❌ Error: Could not find a site directory matching host '{host_input}' (tried '{normalized_host_dir}').")
-            return
+        if args.strategy:
+            json_files = [p for p in json_files if f"-{args.strategy}-" in p.name]
+            report_output_name_parts.append(args.strategy)
+
     else:
-        report_output_name_parts.append("all-sites")
+        # --- Legacy logic for --url, --host, or all sites ---
+        search_dir = base_dir
+        requested_page_slug = None
 
-    if not search_dir.exists():
-        print(f"❌ Error: Directory '{search_dir}' not found. Ensure site data exists.")
-        return
+        if args.url:
+            url_input = args.url if "://" in args.url else f"https://{args.url}"
+            parsed_url = urlparse(url_input)
+            
+            host_part = parsed_url.netloc
+            normalized_host_dir = host_part.replace("www.", "").replace(".", "-")
+            
+            potential_site_dir = base_dir / normalized_host_dir
+            if potential_site_dir.is_dir():
+                search_dir = potential_site_dir
+                report_output_name_parts.append(normalized_host_dir)
+                print(f"✅ Normalized URL's host to site directory: '{normalized_host_dir}'")
 
-    # --- Collect and filter JSON files ---
-    all_json_paths = list(search_dir.rglob('*.json'))
-    json_files = all_json_paths
+                path_part = parsed_url.path
+                if not path_part or path_part == "/":
+                    requested_page_slug = normalized_host_dir
+                else:
+                    requested_page_slug = path_part.strip("/").replace("/", "_")
+                
+                report_output_name_parts.append(requested_page_slug)
+                print(f"✅ Targeting specific page with slug: '{requested_page_slug}'")
+            else:
+                print(f"❌ Error: Could not find a site directory for host '{host_part}' (tried '{normalized_host_dir}').")
+                return
 
-    if requested_page_slug:
-        json_files = [p for p in json_files if get_page_slug_from_path(p) == requested_page_slug]
-        if not json_files:
-            print(f"🟡 Warning: No JSON files found for page '{requested_page_slug}' in '{search_dir}'. Nothing to compare.")
+        elif args.host:
+            host_input = args.host
+            normalized_host_dir = host_input.replace("www.", "").replace(".", "-")
+            
+            potential_site_dir = base_dir / normalized_host_dir
+            if potential_site_dir.is_dir():
+                search_dir = potential_site_dir
+                report_output_name_parts.append(normalized_host_dir)
+                print(f"✅ Found site directory for host: '{normalized_host_dir}'")
+            else:
+                print(f"❌ Error: Could not find a site directory matching host '{host_input}' (tried '{normalized_host_dir}').")
+                return
+        else:
+            report_output_name_parts.append("all-sites")
+
+        if not search_dir.exists():
+            print(f"❌ Error: Directory '{search_dir}' not found. Ensure site data exists.")
             return
 
-    if args.strategy:
-        json_files = [p for p in json_files if f"-{args.strategy}-" in p.name]
-        report_output_name_parts.append(args.strategy)
-        if not json_files:
-            print(f"🟡 Warning: No JSON files found for strategy '{args.strategy}' in the selection. Nothing to compare.")
-            return
-    
+        all_json_paths = list(search_dir.rglob('*.json'))
+        json_files = all_json_paths
+
+        if requested_page_slug:
+            json_files = [p for p in json_files if get_page_slug_from_path(p) == requested_page_slug]
+
+        if args.strategy:
+            json_files = [p for p in json_files if f"-{args.strategy}-" in p.name]
+            report_output_name_parts.append(args.strategy)
+
+    # --- Common processing logic ---
     if not json_files:
-        print(f"🟡 Warning: No JSON files found in '{search_dir}'. Nothing to compare.")
+        print(f"🟡 Warning: No JSON files found matching the criteria. Nothing to compare.")
         return
 
     print(f"📄 Found {len(json_files)} JSON files to process.")
