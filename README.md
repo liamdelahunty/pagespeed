@@ -131,45 +131,63 @@ The generated HTML report contains two main sections, plus an optional section f
 *   **Trend Graphs (Optional):** If the `--with-graphs` flag is used, interactive line charts are generated for each URL and metric, showing performance trends over time for both mobile and desktop strategies.
 
 ## 📈 Generating History Reports
-The `generate_html_report.py` script provides a dynamic way to visualize PageSpeed Insights data over time. It creates interactive HTML reports with trend graphs for specified URLs and time periods, allowing for a detailed historical analysis of performance metrics.
+The `generate_html_report.py` script provides a dynamic way to visualize PageSpeed Insights data over time. It creates interactive HTML reports with data tables and trend graphs for specified URLs and time periods, allowing for a detailed historical analysis of performance metrics.
 
 ### Usage
-This script requires you to specify either a single URL or a file containing multiple URLs, along with a time period or number of last runs.
+This script requires you to specify either a single URL or a file containing multiple URLs, along with a time period or a number of recent runs.
 
 **1. Report for a single URL**
-Use the `-u` or `--url` flag to specify a single URL.
+Use the `-u` or `--url` flag to generate a detailed report for a specific URL.
 ```sh
 # Report for a single URL over the last 28 days
 python generate_html_report.py --url https://www.example.com --period 28d
-
-# Report for a single URL showing the last 10 unique runs
-python generate_html_report.py --url www.example.com --last-runs 10
 ```
 
-**2. Report for URLs from a file**
-Use the `-f` or `--url-file` flag to provide a path to a file containing a list of URLs (one per line). The script will look for the file in the `url-lists/` directory if no path is provided.
+**2. Individual Reports for URLs from a File**
+Use the `-f` or `--url-file` flag to generate a separate, individual report for each URL listed in the file.
 ```sh
-# Report for URLs in 'url-lists/my-list.txt' for the last calendar month
+# Generate a separate report for each URL in 'my-list.txt' for the last calendar month
 python generate_html_report.py --url-file my-list.txt --period last-month
-
-# Report for URLs in 'url-lists/group.txt' for all available data
-python generate_html_report.py --url-file group.txt --period all-time
 ```
 
 ### Time Period Flags
 You must choose either `--period` or `--last-runs`:
-*   `--period {7d, 28d, this-month, last-month, all-time}`:
-    *   `7d`: Last 7 days.
-    *   `28d`: Last 28 days.
-    *   `this-month`: Data from the current calendar month.
-    *   `last-month`: Data from the previous calendar month.
-    *   `all-time`: All available historical data.
-*   `--last-runs N`: An integer `N` to specify the last `N` unique data collection runs for each URL. This is useful for comparing the most recent changes irrespective of calendar dates.
+*   `--period {7d, 28d, this-month, last-month, all-time}`: Defines a relative date range for the data.
+*   `--last-runs N`: Reports on the `N` most recent data collection runs, regardless of date.
 
 ### Output Report
-The script generates a self-contained HTML file in the `reports/` directory. The filename will follow the pattern: `history-report-<source>-YYYY-MM-DD-HHMM.html`, where `<source>` is the domain of the single URL or the filename of the URL list. The report includes:
-*   Interactive line charts for all key PageSpeed metrics (Performance Score, LCP, CLS, etc.) for both desktop and mobile strategies.
-*   A clear display of the URL(s) and the specified reporting period.
+The script generates one or more self-contained HTML files in the `reports/` directory. The filename is deterministic based on the data it contains, following the pattern: `history-report-<source>-<start_date>-<end_date>.html`.
+*   `<source>` is the domain name of the URL.
+*   `<start_date>` and `<end_date>` are the dates of the oldest and newest records in the report (formatted as YYYYMMDD).
+
+This ensures that if you re-run a report on the same data, the file is overwritten, but if new data is included, a new file is created.
+
+Each report includes:
+*   A **Data Summary** table showing key metrics for each run.
+*   Interactive line charts for all key PageSpeed metrics (Performance Score, LCP, CLS, etc.).
+*   A single-line header and footer with report metadata and helpful links.
+
+## 📊 Generating Consolidated Summary Reports
+The `generate_summary_report.py` script creates a high-level, consolidated summary of performance score trends for a list of URLs. It's designed to give a quick overview of how multiple sites are progressing over a specific period.
+
+### Usage
+This script requires a URL file and a time period.
+```sh
+# Generate a summary for all URLs in 'group.txt' for the last 4 runs
+python generate_summary_report.py -f group.txt --last-runs 4
+
+# Generate a summary for URLs in 'clients.txt' over the last 28 days
+python generate_summary_report.py -f clients.txt --period 28d
+```
+
+### Output Report
+This script generates a **single** HTML file in the `reports/` directory, named using the pattern `summary-report-<source>-<start_date>-<end_date>.html`.
+*   `<source>` is the name of the input URL file.
+*   `<start_date>` and `<end_date>` are the dates of the oldest and newest records across all data in the report.
+
+The report contains:
+*   **Performance Trend Graphs:** Two consolidated line charts (one for Desktop, one for Mobile) showing the Performance Score trend for every URL, making it easy to compare sites against each other.
+*   **Score Change Summary:** A table detailing the change in performance for each URL and strategy, comparing the first and last data points in the selected period.
 
 
 

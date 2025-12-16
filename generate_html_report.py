@@ -83,6 +83,14 @@ def extract_metrics_from_json(data: dict) -> Dict[str, object]:
     }
 
 
+def get_timestamp_from_stem(stem: str) -> str:
+    """Robustly extracts the timestamp from a filename stem."""
+    if '-desktop-' in stem:
+        return stem.split('-desktop-')[1]
+    if '-mobile-' in stem:
+        return stem.split('-mobile-')[1]
+    return ""
+
 def get_historical_data(url: str, start_date: datetime.date = None, end_date: datetime.date = None, last_n_runs: int = None) -> pd.DataFrame:
     """
     Retrieves historical PageSpeed Insights data for a given URL and strategy,
@@ -101,38 +109,68 @@ def get_historical_data(url: str, start_date: datetime.date = None, end_date: da
         print(f"[WARN] No debug data found for {url} in {site_debug_dir}", file=sys.stderr)
         return pd.DataFrame()
 
-    all_json_files = sorted(site_debug_dir.glob(f"{page_slug}-*-*.json"), reverse=True) # newest first
+    all_json_files = list(site_debug_dir.glob(f"{page_slug}-*-*.json"))
+
+    if page_slug == "_root_":
+        # Also look for files named with the domain slug as a fallback
+        domain_slug_files = list(site_debug_dir.glob(f"{site_dir_name}-*-*.json"))
+        all_json_files.extend(domain_slug_files)
+    
+    # Remove duplicates and sort newest first
+    all_json_files = sorted(list(set(all_json_files)), key=lambda p: p.name, reverse=True)
 
     if last_n_runs is not None:
         # Filter to get the last N unique runs based on timestamp
-        unique_timestamps = sorted(list(set([f.stem.split('-')[-1] for f in all_json_files])), reverse=True)
+        unique_timestamps = sorted(list(set([get_timestamp_from_stem(f.stem) for f in all_json_files if get_timestamp_from_stem(f.stem)])), reverse=True)
         timestamps_for_n_runs = unique_timestamps[:last_n_runs]
         
         filtered_json_files = []
         for ts in timestamps_for_n_runs:
             for f in all_json_files:
-                if f.stem.endswith(ts) and f not in filtered_json_files:
+                if get_timestamp_from_stem(f.stem) == ts and f not in filtered_json_files:
                     filtered_json_files.append(f)
-        all_json_files = sorted(filtered_json_files) # sort by date for plotting
+        all_json_files = sorted(filtered_json_files, key=lambda p: p.name) # sort by date for plotting
 
     for json_file in all_json_files:
         try:
-            parts = json_file.stem.split('-')
-            file_page_slug = '-'.join(parts[:-2])
-            file_strategy = parts[-2]
-            file_timestamp_str = parts[-1]
-            
+            # Robustly parse filename
+            stem = json_file.stem
+            file_strategy = None
+            if '-desktop-' in stem:
+                file_strategy = 'desktop'
+                parts = stem.split('-desktop-')
+            elif '-mobile-' in stem:
+                file_strategy = 'mobile'
+                parts = stem.split('-mobile-')
+            else:
+                continue
+
+            file_page_slug = parts[0]
+            file_timestamp_str = parts[1]
+
             # Basic validation of filename parts
-            if not (file_page_slug == page_slug and file_strategy in STRATEGIES):
+            is_valid_slug = (file_page_slug == page_slug)
+            if page_slug == "_root_":
+                is_valid_slug = is_valid_slug or (file_page_slug == site_dir_name)
+
+            if not (is_valid_slug and file_strategy in STRATEGIES):
                 continue
             
-            file_datetime = datetime.datetime.strptime(file_timestamp_str, "%Y%m%d%H%M")
+            try:
+                # First, try to parse with seconds
+                file_datetime = datetime.datetime.strptime(file_timestamp_str, "%Y-%m-%d-%H%M%S")
+            except ValueError:
+                # If that fails, try to parse without seconds
+                file_datetime = datetime.datetime.strptime(file_timestamp_str, "%Y-%m-%d-%H%M")
+            
             file_date = file_datetime.date()
 
-            if start_date and file_date < start_date:
-                continue
-            if end_date and file_date > end_date:
-                continue
+            # If using --period, filter by date. This check is skipped for --last-runs.
+            if last_n_runs is None:
+                if start_date and file_date < start_date:
+                    continue
+                if end_date and file_date > end_date:
+                    continue
             
             with open(json_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -195,7 +233,7 @@ def main():
     parser.add_argument(
         "-f", "--url-file",
         type=str,
-        help="Path to a file containing a list of URLs (one per line). Overrides -u."
+        help="Path to a file containing a list of URLs (one per line). Generates individual reports for each URL."
     )
     parser.add_argument(
         "-u", "--url",
@@ -218,29 +256,21 @@ def main():
     args = parser.parse_args()
 
     urls_to_process: List[str] = []
-    report_name_base = ""
-
+    
     if args.url_file:
         urls_to_process = load_urls(args.url_file)
-        report_name_base = Path(args.url_file).stem
-        print(f"🔎 Using URL file: {args.url_file}")
+        print(f"🔎 Processing {len(urls_to_process)} URLs from file: {args.url_file}")
     elif args.url:
         url_to_test = args.url
         if not url_to_test.startswith(('http://', 'https://')):
             url_to_test = 'https://' + url_to_test
         urls_to_process.append(url_to_test)
-        parsed_url = urlparse(url_to_test)
-        report_name_base = parsed_url.netloc.replace("www.", "").replace(".", "-")
-        print(f"🔎 Testing single URL: {url_to_test}")
+        print(f"🔎 Processing single URL: {url_to_test}")
     else:
         print("[ERROR] No URLs provided. Use -u or -f.", file=sys.stderr)
         sys.exit(1)
 
-    if not urls_to_process:
-        print("[ERROR] No URLs found for testing. Exiting.", file=sys.stderr)
-        sys.exit(1)
-
-    # Determine date range
+    # Determine date range for filtering
     start_date, end_date = None, datetime.date.today()
     if args.period:
         if args.period == '7d':
@@ -253,48 +283,16 @@ def main():
             first_day_this_month = end_date.replace(day=1)
             last_day_last_month = first_day_this_month - datetime.timedelta(days=1)
             start_date = last_day_last_month.replace(day=1)
-            end_date = last_day_last_month # Set end_date to the last day of last month
+            end_date = last_day_last_month
         elif args.period == 'all-time':
-            start_date = datetime.date(2000, 1, 1) # Effectively all time
+            start_date = datetime.date(2000, 1, 1)
     
-    print(f"🗓️ Generating report for period: {args.period or f'last {args.last_runs} runs'}")
-    if start_date and end_date:
-        print(f"    From {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
+    print(f"🗓️ Reporting for period: {args.period or f'last {args.last_runs} runs'}")
+    if start_date and end_date and args.period != 'all-time':
+        print(f"    (From {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')})")
 
-    all_data_frames = []
-    for url in urls_to_process:
-        df = get_historical_data(url, start_date=start_date, end_date=end_date, last_n_runs=args.last_runs)
-        if not df.empty:
-            all_data_frames.append(df)
-        else:
-            print(f"[WARN] No data found for {url} within the specified period.", file=sys.stderr)
-
-    if not all_data_frames:
-        print("[ERROR] No historical data available for any of the provided URLs within the specified period. Exiting.", file=sys.stderr)
-        sys.exit(1)
-
-    # Prepare data for rendering
-    report_data = []
-    for df in all_data_frames:
-        url = df["URL"].iloc[0]
-        # Generate plots for key metrics
-        plots = {
-            "PerformanceScore": create_metric_plot(df, "PerformanceScore", f"Performance Score over Time for {url}"),
-            "LCP_ms": create_metric_plot(df, "LCP_ms", f"Largest Contentful Paint (ms) over Time for {url}"),
-            "CLS": create_metric_plot(df, "CLS", f"Cumulative Layout Shift over Time for {url}"),
-            "FCP_ms": create_metric_plot(df, "FCP_ms", f"First Contentful Paint (ms) over Time for {url}"),
-            "TBT_ms": create_metric_plot(df, "TBT_ms", f"Total Blocking Time (ms) over Time for {url}"),
-            "TTI_ms": create_metric_plot(df, "TTI_ms", f"Time To Interactive (ms) over Time for {url}"),
-            "SpeedIndex_ms": create_metric_plot(df, "SpeedIndex_ms", f"Speed Index (ms) over Time for {url}"),
-            "SRT_ms": create_metric_plot(df, "SRT_ms", f"Server Response Time (ms) over Time for {url}"),
-            "AccessibilityScore": create_metric_plot(df, "AccessibilityScore", f"Accessibility Score over Time for {url}"),
-            "BestPracticesScore": create_metric_plot(df, "BestPracticesScore", f"Best Practices Score over Time for {url}"),
-            "SEOScore": create_metric_plot(df, "SEOScore", f"SEO Score over Time for {url}"),
-        }
-        report_data.append({"url": url, "plots": plots})
-
-    # Set up Jinja2 environment
-    template_loader = FileSystemLoader(searchpath="./") # Look for templates in current dir
+    # Set up Jinja2 environment once
+    template_loader = FileSystemLoader(searchpath="./")
     env = Environment(loader=template_loader)
     template = env.from_string("""
 <!DOCTYPE html>
@@ -307,25 +305,33 @@ def main():
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
         .container { max-width: 1200px; margin: auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        h1, h2 { color: #0056b3; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; margin-top: 30px; }
-        h1 { font-size: 2.2em; text-align: center; }
-        h2 { font-size: 1.8em; }
+        h1, h2, h3 { color: #0056b3; }
+        h1 { font-size: 2.2em; text-align: center; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; margin-bottom: 20px; }
+        h2 { font-size: 1.8em; border-bottom: 1px solid #e0e0e0; padding-bottom: 8px; margin-top: 40px;}
+        h3 { font-size: 1.4em; }
         .url-section { margin-bottom: 40px; padding: 20px; background-color: #f9f9f9; border-left: 5px solid #007bff; border-radius: 4px; }
-        .plot-container { margin-bottom: 20px; }
+        .plot-container, .table-container { margin-bottom: 30px; }
         p { line-height: 1.6; }
         .footer { text-align: center; margin-top: 50px; font-size: 0.8em; color: #777; }
         .date-range { text-align: center; margin-bottom: 30px; font-style: italic; color: #555; }
+        .data-table { width: 100%; border-collapse: collapse; margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .data-table th, .data-table td { border: 1px solid #ddd; padding: 12px; text-align: center; }
+        .data-table th { background-color: #0056b3; color: white; font-weight: bold; }
+        .data-table tr:nth-child(even) { background-color: #f2f2f2; }
+        .data-table tr:hover { background-color: #e2e2e2; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>PageSpeed History Report</h1>
-        <p class="date-range">Report Generated: {{ generation_date }}</p>
-        <p class="date-range">Period: {{ period_display }} {% if start_date and end_date %}({{ start_date }} to {{ end_date }}){% endif %}</p>
-
+        <p class="date-range">Report Generated: {{ generation_date }} | Period: {{ period_display }} {% if start_date and end_date %}({{ start_date }} to {{ end_date }}){% endif %}</p>
         {% for entry in report_data %}
             <div class="url-section">
                 <h2>History for: <a href="{{ entry.url }}" target="_blank">{{ entry.url }}</a></h2>
+                <div class="table-container">
+                    <h3>Data Summary</h3>
+                    {{ entry.table | safe }}
+                </div>
                 {% for plot_title, plot_html in entry.plots.items() %}
                     <div class="plot-container">
                         <h3>{{ plot_title.replace('_', ' ').replace('ms', '(ms)') }}</h3>
@@ -334,33 +340,72 @@ def main():
                 {% endfor %}
             </div>
         {% endfor %}
-
         <div class="footer">
-            <p>Generated by generate_html_report.py</p>
+            <p>Generated by generate_html_report.py | Learn more: <a href="https://developers.google.com/speed/docs/insights/v5/about" target="_blank">PageSpeed Insights Documentation</a> | <a href="https://googlechrome.github.io/lighthouse/viewer/" target="_blank">Lighthouse Report Viewer</a> | <a href="https://github.com/liamdelahunty/pagespeed" target="_blank">GitHub Repository</a></p>
         </div>
     </div>
 </body>
 </html>
 """)
 
-    # Render the template
-    html_output = template.render(
-        report_title=report_name_base,
-        generation_date=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-        period_display=args.period or f"Last {args.last_runs} runs",
-        start_date=start_date.strftime('%Y-%m-%d') if start_date else 'N/A',
-        end_date=end_date.strftime('%Y-%m-%d') if end_date else 'N/A',
-        report_data=report_data
-    )
+    # Process each URL and generate a separate report
+    for url in urls_to_process:
+        df = get_historical_data(url, start_date=start_date, end_date=end_date, last_n_runs=args.last_runs)
+        
+        if df.empty:
+            print(f"\n[WARN] No data found for {url} within the specified period. Skipping report generation.")
+            continue
 
-    # Save the report
-    timestamp_suffix = datetime.datetime.now().strftime("%Y-%m-%d-%H%M")
-    output_filename = REPORTS_DIR / f"history-report-{report_name_base}-{timestamp_suffix}.html"
-    with open(output_filename, "w", encoding="utf-8") as f:
-        f.write(html_output)
-    
-    print(f"\n✅ HTML report generated: {output_filename}")
+        # --- Prepare data for a single URL report ---
+        report_data = []
+        
+        # Prepare data table
+        table_df = df.copy()
+        table_df['Date'] = pd.to_datetime(table_df['Date']).dt.strftime('%Y-%m-%d %H:%M')
+        pivot_df = table_df.pivot(index='Date', columns='Strategy', values=['PerformanceScore', 'LCP_ms', 'CLS', 'FCP_ms', 'TBT_ms'])
+        
+        new_columns = []
+        for col_name in pivot_df.columns:
+            metric_raw, strategy = col_name[0], col_name[1]
+            metric_formatted = metric_raw.replace("Score", " Score").replace("_ms", " (ms)").replace("_", " ")
+            new_columns.append(f"{metric_formatted.strip()} {strategy.capitalize()}")
+        pivot_df.columns = new_columns
+        pivot_df = pivot_df.reset_index()
+        data_table_html = pivot_df.to_html(classes='data-table', border=0, index=False, justify='center')
 
+        # Generate plots
+        plots = {
+            "PerformanceScore": create_metric_plot(df, "PerformanceScore", f"Performance Score over Time"),
+            "LCP_ms": create_metric_plot(df, "LCP_ms", f"Largest Contentful Paint (ms) over Time"),
+            "CLS": create_metric_plot(df, "CLS", f"Cumulative Layout Shift over Time"),
+            # Add other plots as needed
+        }
+        report_data.append({"url": url, "plots": plots, "table": data_table_html})
+
+        # --- Render and Save Report ---
+        report_name_base = urlparse(url).netloc.replace("www.", "").replace(".", "-")
+        
+        # Determine the date range for display in the report
+        report_start_date = df['Date'].min()
+        report_end_date = df['Date'].max()
+
+        html_output = template.render(
+            report_title=url,
+            generation_date=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+            period_display=args.period or f"Last {args.last_runs} runs",
+            start_date=report_start_date.strftime('%Y-%m-%d'),
+            end_date=report_end_date.strftime('%Y-%m-%d'),
+            report_data=report_data
+        )
+
+        # --- Filename Generation ---
+        filename_suffix = f"{report_start_date.strftime('%Y%m%d')}-{report_end_date.strftime('%Y%m%d')}"
+        output_filename = REPORTS_DIR / f"history-report-{report_name_base}-{filename_suffix}.html"
+        
+        with open(output_filename, "w", encoding="utf-8") as f:
+            f.write(html_output)
+        
+        print(f"\n✅ HTML report generated for {url}: {output_filename}")
 
 if __name__ == "__main__":
     main()
