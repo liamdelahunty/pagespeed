@@ -25,7 +25,7 @@ Upgrade pip (optional but recommended):
 
 Install required packages (run in the project folder):
 
-```py -m pip install requests tqdm python-dotenv```
+```py -m pip install requests tqdm python-dotenv pandas plotly Jinja2```
 
 Create a Google Cloud API key with the [PageSpeed Insights API](https://developers.google.com/speed/docs/insights/v5/get-started) enabled.
 Store it in a .env file (same folder as the script):
@@ -129,6 +129,49 @@ The generated HTML report contains two main sections, plus an optional section f
     *   **Smart Headers:** To save space, timestamps are grouped. The top header row shows the Date (and spans across multiple tests from the same day), while the second row shows the Time.
     *   **Grouped Columns:** Mobile and Desktop tests run within two minutes of each other are grouped into a single column, making it easy to compare results from the same test run.
 *   **Trend Graphs (Optional):** If the `--with-graphs` flag is used, interactive line charts are generated for each URL and metric, showing performance trends over time for both mobile and desktop strategies.
+
+## 📈 Generating History Reports
+The `generate_html_report.py` script provides a dynamic way to visualize PageSpeed Insights data over time. It creates interactive HTML reports with trend graphs for specified URLs and time periods, allowing for a detailed historical analysis of performance metrics.
+
+### Usage
+This script requires you to specify either a single URL or a file containing multiple URLs, along with a time period or number of last runs.
+
+**1. Report for a single URL**
+Use the `-u` or `--url` flag to specify a single URL.
+```sh
+# Report for a single URL over the last 28 days
+python generate_html_report.py --url https://www.example.com --period 28d
+
+# Report for a single URL showing the last 10 unique runs
+python generate_html_report.py --url www.example.com --last-runs 10
+```
+
+**2. Report for URLs from a file**
+Use the `-f` or `--url-file` flag to provide a path to a file containing a list of URLs (one per line). The script will look for the file in the `url-lists/` directory if no path is provided.
+```sh
+# Report for URLs in 'url-lists/my-list.txt' for the last calendar month
+python generate_html_report.py --url-file my-list.txt --period last-month
+
+# Report for URLs in 'url-lists/group.txt' for all available data
+python generate_html_report.py --url-file group.txt --period all-time
+```
+
+### Time Period Flags
+You must choose either `--period` or `--last-runs`:
+*   `--period {7d, 28d, this-month, last-month, all-time}`:
+    *   `7d`: Last 7 days.
+    *   `28d`: Last 28 days.
+    *   `this-month`: Data from the current calendar month.
+    *   `last-month`: Data from the previous calendar month.
+    *   `all-time`: All available historical data.
+*   `--last-runs N`: An integer `N` to specify the last `N` unique data collection runs for each URL. This is useful for comparing the most recent changes irrespective of calendar dates.
+
+### Output Report
+The script generates a self-contained HTML file in the `reports/` directory. The filename will follow the pattern: `history-report-<source>-YYYY-MM-DD-HHMM.html`, where `<source>` is the domain of the single URL or the filename of the URL list. The report includes:
+*   Interactive line charts for all key PageSpeed metrics (Performance Score, LCP, CLS, etc.) for both desktop and mobile strategies.
+*   A clear display of the URL(s) and the specified reporting period.
+
+
 
 ## 🧹 Organising Raw Reports
 
