@@ -288,20 +288,15 @@ def run_group_report(args: argparse.Namespace):
     # --- Logic for Grouped/Ordered Report ---
     if grouped_data:
         print(f"📖 Found ordering file: {ordering_json_path}. Generating grouped report.")
-        url_to_group_info = {item['URL']: item for item in grouped_data}
-        ordered_groups = {}
-        for item in grouped_data:
-            company = item['Company']
-            if company not in ordered_groups:
-                ordered_groups[company] = []
-
-        for url in urls_to_process:
-            if url not in url_to_group_info:
-                print(f"[WARN] URL '{url}' from '{args.url_file}' not found in ordering file. Skipping.")
+        
+        report_data = []
+        # Iterate through the ordering file to maintain the desired order
+        for group_item in grouped_data:
+            url = group_item['URL']
+            
+            # Only process URLs that are also in the primary url-file
+            if url not in urls_to_process:
                 continue
-
-            group_info = url_to_group_info[url]
-            company = group_info['Company']
 
             desktop_data = get_latest_pagespeed_data(url, "desktop")
             mobile_data = get_latest_pagespeed_data(url, "mobile")
@@ -309,8 +304,9 @@ def run_group_report(args: argparse.Namespace):
             if desktop_data: all_timestamps.append(desktop_data['timestamp_dt'])
             if mobile_data: all_timestamps.append(mobile_data['timestamp_dt'])
 
-            ordered_groups[company].append({
-                "type": group_info['Type'],
+            report_data.append({
+                "company": group_item['Company'],
+                "type": group_item['Type'],
                 "url": url,
                 "desktop_score": desktop_data['score'] if desktop_data else "N/A",
                 "mobile_score": mobile_data['score'] if mobile_data else "N/A"
@@ -318,8 +314,7 @@ def run_group_report(args: argparse.Namespace):
         
         template_str = GROUPED_REPORT_TEMPLATE
         render_context = {
-            "grouped_results": ordered_groups,
-            "generation_date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "report_data": report_data
         }
 
     # --- Logic for Simple (Ungrouped) Report ---
@@ -341,18 +336,28 @@ def run_group_report(args: argparse.Namespace):
             
         template_str = SIMPLE_REPORT_TEMPLATE
         render_context = {
-            "results": results,
-            "generation_date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "results": results
         }
 
-    # --- Filename Generation ---
+    # --- Filename and Subtitle Generation ---
     report_name_base = url_file_path.stem
+    min_date_str, max_date_str = "", ""
     if all_timestamps:
         min_date = min(all_timestamps)
         max_date = max(all_timestamps)
         filename_suffix = f"{min_date.strftime('%Y%m%d')}-{max_date.strftime('%Y%m%d')}"
+        min_date_str = min_date.strftime('%Y-%m-%d')
+        max_date_str = max_date.strftime('%Y-%m-%d')
     else:
-        filename_suffix = datetime.datetime.now().strftime("%Y%m%d")
+        now = datetime.datetime.now()
+        filename_suffix = now.strftime("%Y%m%d")
+        min_date_str = max_date_str = now.strftime('%Y-%m-%d')
+
+    render_context.update({
+        "generation_date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "start_date": min_date_str,
+        "end_date": max_date_str
+    })
         
     output_filename = REPORTS_DIR / f"latest-scores-{report_name_base}-{filename_suffix}.html"
     
@@ -455,11 +460,12 @@ SIMPLE_REPORT_TEMPLATE = """
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Latest PageSpeed Score Report</title>
+    <title>PageSpeed Insights Scores</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
         .container { max-width: 900px; margin: auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         h1 { color: #0056b3; text-align: center; }
+        p.subtitle { text-align: center; color: #555; }
         .report-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         .report-table th, .report-table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         .report-table th { background-color: #0056b3; color: white; }
@@ -472,8 +478,8 @@ SIMPLE_REPORT_TEMPLATE = """
 </head>
 <body>
     <div class="container">
-        <h1>Latest PageSpeed Score Report</h1>
-        <p style="text-align:center;">Generated: {{ generation_date }}</p>
+        <h1>PageSpeed Insights Scores</h1>
+        <p class="subtitle">Report for data between {{ start_date }} and {{ end_date }}.<br>Generated on {{ generation_date }}</p>
         <table class="report-table">
             <thead>
                 <tr>
@@ -505,13 +511,13 @@ GROUPED_REPORT_TEMPLATE = """
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Latest PageSpeed Score Report</title>
+    <title>PageSpeed Insights Scores</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
         .container { max-width: 1200px; margin: auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        h1, h2 { color: #0056b3; text-align: center; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; margin-bottom: 20px; }
-        h3 { color: #0056b3; margin-top: 30px; }
-        .report-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        h1 { color: #0056b3; text-align: center; }
+        p.subtitle { text-align: center; color: #555; }
+        .report-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         .report-table th, .report-table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         .report-table th { background-color: #0056b3; color: white; }
         .report-table tr:nth-child(even) { background-color: #f2f2f2; }
@@ -523,31 +529,30 @@ GROUPED_REPORT_TEMPLATE = """
 </head>
 <body>
     <div class="container">
-        <h1>Latest PageSpeed Score Report</h1>
-        <p style="text-align:center;">Generated: {{ generation_date }}</p>
-        {% for company, urls in grouped_results.items() %}
-            <h3>{{ company }}</h3>
-            <table class="report-table">
-                <thead>
-                    <tr>
-                        <th>Type</th>
-                        <th>URL</th>
-                        <th>Desktop Score</th>
-                        <th>Mobile Score</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in urls %}
-                    <tr>
-                        <td>{{ item.type }}</td>
-                        <td><a href="{{ item.url }}" target="_blank">{{ item.url }}</a></td>
-                        <td class="{{ item.desktop_score | score_color_class }}">{{ item.desktop_score }}</td>
-                        <td class="{{ item.mobile_score | score_color_class }}">{{ item.mobile_score }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        {% endfor %}
+        <h1>PageSpeed Insights Scores</h1>
+        <p class="subtitle">Report for data between {{ start_date }} and {{ end_date }}.<br>Generated on {{ generation_date }}</p>
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>Company</th>
+                    <th>Type</th>
+                    <th>URL</th>
+                    <th>Desktop Score</th>
+                    <th>Mobile Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in report_data %}
+                <tr>
+                    <td>{{ item.company }}</td>
+                    <td>{{ item.type }}</td>
+                    <td><a href="{{ item.url }}" target="_blank">{{ item.url }}</a></td>
+                    <td class="{{ item.desktop_score | score_color_class }}">{{ item.desktop_score }}</td>
+                    <td class="{{ item.mobile_score | score_color_class }}">{{ item.mobile_score }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
         <div class="footer">
             <p>Generated by generate_summary_report.py | Learn more: <a href="https://developers.google.com/speed/docs/insights/v5/about" target="_blank">PageSpeed Insights Documentation</a> | <a href="https://googlechrome.github.io/lighthouse/viewer/" target="_blank">Lighthouse Report Viewer</a> | <a href="https://github.com/liamdelahunty/pagespeed" target="_blank">GitHub Repository</a></p>
         </div>
