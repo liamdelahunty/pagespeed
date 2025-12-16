@@ -374,7 +374,7 @@ Contact: liam.delahunty (at) croneri.co.uk
                     metrics["TBT_ms"],
                     metrics["CLS"],
                     metrics["SRT_ms"],
-                    "",                         # Notes - you can fill manually later
+                    "", # Notes
                 ]
 
                 append_row(output_csv, csv_row)
@@ -422,7 +422,7 @@ Contact: liam.delahunty (at) croneri.co.uk
                     metrics["TBT_ms"],
                     metrics["CLS"],
                     metrics["SRT_ms"],
-                    "RETRY",                         # Notes - you can fill manually later
+                    "RETRY", # Notes
                 ]
 
                 append_row(output_csv, csv_row)
