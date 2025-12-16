@@ -117,7 +117,8 @@ def get_latest_pagespeed_data(url: str, strategy: str) -> Optional[Dict[str, Any
                     
                     return {
                         "score": perf_score,
-                        "timestamp": file_datetime.strftime("%Y-%m-%d %H:%M:%S")
+                        "timestamp_str": file_datetime.strftime("%Y-%m-%d %H:%M:%S"),
+                        "timestamp_dt": file_datetime
                     }
         except Exception as e:
             print(f"[WARN] Could not process file {json_file}: {e}", file=sys.stderr)
@@ -262,7 +263,6 @@ def run_group_report(args: argparse.Namespace):
     urls_to_process = load_urls(args.url_file)
     print(f"🔎 Processing {len(urls_to_process)} URLs from file: {args.url_file} for latest score report.")
 
-    # Derive ordering JSON filename
     url_file_path = Path(args.url_file)
     if not url_file_path.exists():
         url_file_path = URL_LISTS_DIR / args.url_file
@@ -283,18 +283,12 @@ def run_group_report(args: argparse.Namespace):
             return ""
     env.filters['score_color_class'] = score_color_class
 
-    report_name_base = url_file_path.stem
-    current_datetime_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_filename = REPORTS_DIR / f"latest-scores-{report_name_base}-{current_datetime_str}.html"
-
+    all_timestamps = []
+    
     # --- Logic for Grouped/Ordered Report ---
     if grouped_data:
         print(f"📖 Found ordering file: {ordering_json_path}. Generating grouped report.")
-        
-        # Create a URL-to-group map for quick lookup
         url_to_group_info = {item['URL']: item for item in grouped_data}
-        
-        # Prepare data structure that respects the order in the JSON file
         ordered_groups = {}
         for item in grouped_data:
             company = item['Company']
@@ -311,6 +305,9 @@ def run_group_report(args: argparse.Namespace):
 
             desktop_data = get_latest_pagespeed_data(url, "desktop")
             mobile_data = get_latest_pagespeed_data(url, "mobile")
+            
+            if desktop_data: all_timestamps.append(desktop_data['timestamp_dt'])
+            if mobile_data: all_timestamps.append(mobile_data['timestamp_dt'])
 
             ordered_groups[company].append({
                 "type": group_info['Type'],
@@ -320,10 +317,10 @@ def run_group_report(args: argparse.Namespace):
             })
         
         template_str = GROUPED_REPORT_TEMPLATE
-        html_output = env.from_string(template_str).render(
-            grouped_results=ordered_groups,
-            generation_date=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        )
+        render_context = {
+            "grouped_results": ordered_groups,
+            "generation_date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
 
     # --- Logic for Simple (Ungrouped) Report ---
     else:
@@ -332,6 +329,10 @@ def run_group_report(args: argparse.Namespace):
         for url in urls_to_process:
             desktop_data = get_latest_pagespeed_data(url, "desktop")
             mobile_data = get_latest_pagespeed_data(url, "mobile")
+            
+            if desktop_data: all_timestamps.append(desktop_data['timestamp_dt'])
+            if mobile_data: all_timestamps.append(mobile_data['timestamp_dt'])
+            
             results.append({
                 "url": url,
                 "desktop_score": desktop_data['score'] if desktop_data else "N/A",
@@ -339,11 +340,24 @@ def run_group_report(args: argparse.Namespace):
             })
             
         template_str = SIMPLE_REPORT_TEMPLATE
-        html_output = env.from_string(template_str).render(
-            results=results,
-            generation_date=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        )
+        render_context = {
+            "results": results,
+            "generation_date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
 
+    # --- Filename Generation ---
+    report_name_base = url_file_path.stem
+    if all_timestamps:
+        min_date = min(all_timestamps)
+        max_date = max(all_timestamps)
+        filename_suffix = f"{min_date.strftime('%Y%m%d')}-{max_date.strftime('%Y%m%d')}"
+    else:
+        filename_suffix = datetime.datetime.now().strftime("%Y%m%d")
+        
+    output_filename = REPORTS_DIR / f"latest-scores-{report_name_base}-{filename_suffix}.html"
+    
+    # --- Render and Write ---
+    html_output = env.from_string(template_str).render(**render_context)
     with open(output_filename, "w", encoding="utf-8") as f:
         f.write(html_output)
     print(f"\n✅ Latest score report generated: {output_filename}")
