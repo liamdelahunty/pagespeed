@@ -3,6 +3,8 @@
 generate_summary_report.py
 Generates a consolidated HTML summary report showing the performance 
 score progress for a list of URLs over a given period.
+
+Can also generate a 'latest score' report with the --group-report flag.
 """
 import os
 import sys
@@ -13,25 +15,30 @@ import argparse
 import pandas as pd
 import plotly.graph_objects as go
 from jinja2 import Environment, FileSystemLoader
-from typing import List, Dict
+from typing import List, Dict, Any, Optional
 from urllib.parse import urlparse
 from pathlib import Path
 
 # --- Constants ---
 REPORTS_DIR = pathlib.Path("reports")
 DEBUG_RESPONSES_DIR = pathlib.Path("debug-responses")
+URL_LISTS_DIR = pathlib.Path("url-lists")
 
 # Strategies we expect to find data for
 STRATEGIES = ("desktop", "mobile")
 
+# Ensure necessary directories exist
+REPORTS_DIR.mkdir(exist_ok=True)
+
 # --- Helper Functions ---
+
 def load_urls(path: str) -> List[str]:
     """Read URLs from a file, one per line, stripping whitespace."""
     file_path = Path(path)
     if not file_path.exists():
-        file_path = Path("url-lists") / path
+        file_path = URL_LISTS_DIR / path
         if not file_path.exists():
-            print(f"[ERROR] URL file '{path}' not found in the root or in the 'url-lists' directory.", file=sys.stderr)
+            print(f"[ERROR] URL file '{path}' not found in the root or in '{URL_LISTS_DIR}'.", file=sys.stderr)
             sys.exit(1)
     with open(file_path, "r", encoding="utf-8") as f:
         urls = [line.strip() for line in f.readlines() if line.strip()]
@@ -40,6 +47,27 @@ def load_urls(path: str) -> List[str]:
         sys.exit(1)
     return urls
 
+def load_grouped_urls(path: str) -> Optional[List[Dict[str, str]]]:
+    """Read grouped URLs from a JSON file."""
+    file_path = Path(path)
+    if not file_path.exists():
+        return None
+    
+    with open(file_path, "r", encoding="utf-8") as f:
+        try:
+            grouped_data = json.load(f)
+            if not isinstance(grouped_data, list):
+                print(f"[ERROR] Expected a JSON array in '{file_path}'.", file=sys.stderr)
+                return None
+            for item in grouped_data:
+                if not all(k in item for k in ["Company", "Type", "URL"]):
+                    print(f"[ERROR] Each item in '{file_path}' must have 'Company', 'Type', and 'URL' keys.", file=sys.stderr)
+                    return None
+            return grouped_data
+        except json.JSONDecodeError as e:
+            print(f"[ERROR] Invalid JSON in file '{file_path}': {e}", file=sys.stderr)
+            return None
+
 def get_timestamp_from_stem(stem: str) -> str:
     """Robustly extracts the timestamp from a filename stem."""
     if '-desktop-' in stem:
@@ -47,6 +75,55 @@ def get_timestamp_from_stem(stem: str) -> str:
     if '-mobile-' in stem:
         return stem.split('-mobile-')[1]
     return ""
+
+def get_latest_pagespeed_data(url: str, strategy: str) -> Optional[Dict[str, Any]]:
+    """Retrieves the latest PageSpeed Insights data for a given URL and strategy."""
+    parsed_url = urlparse(url)
+    site_dir_name = parsed_url.netloc.replace("www.", "").replace(".", "-")
+    page_slug = parsed_url.path.strip("/").replace("/", "_") or "_root_"
+    
+    site_debug_dir = DEBUG_RESPONSES_DIR / site_dir_name
+    if not site_debug_dir.exists():
+        return None
+
+    search_pattern = f"{page_slug}-{strategy}-*.json"
+    
+    json_files = list(site_debug_dir.glob(search_pattern))
+    if page_slug == "_root_":
+        domain_pattern = f"{site_dir_name}-{strategy}-*.json"
+        json_files.extend(list(site_debug_dir.glob(domain_pattern)))
+    
+    if not json_files:
+        return None
+
+    # Sort files by timestamp in their stem, descending, to get the latest
+    json_files.sort(key=lambda p: get_timestamp_from_stem(p.stem), reverse=True)
+    
+    for json_file in json_files:
+        try:
+            with open(json_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                score = data.get("lighthouseResult", {}).get("categories", {}).get("performance", {}).get("score")
+                
+                if score is not None:
+                    perf_score = int(score * 100)
+                    stem = json_file.stem
+                    file_timestamp_str = get_timestamp_from_stem(stem)
+                    
+                    try:
+                        file_datetime = datetime.datetime.strptime(file_timestamp_str, "%Y-%m-%d-%H%M%S")
+                    except ValueError:
+                        file_datetime = datetime.datetime.strptime(file_timestamp_str, "%Y-%m-%d-%H%M")
+                    
+                    return {
+                        "score": perf_score,
+                        "timestamp": file_datetime.strftime("%Y-%m-%d %H:%M:%S")
+                    }
+        except Exception as e:
+            print(f"[WARN] Could not process file {json_file}: {e}", file=sys.stderr)
+            continue
+            
+    return None
 
 def get_historical_data(url: str, start_date: datetime.date = None, end_date: datetime.date = None, last_n_runs: int = None) -> pd.DataFrame:
     """Retrieves historical PageSpeed Insights data for a given URL."""
@@ -140,32 +217,142 @@ def create_summary_plot(all_dfs: List[pd.DataFrame], strategy: str) -> str:
 # --- Main Logic ---
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate a consolidated HTML summary report of PageSpeed performance scores.",
+        description="Generate HTML summary reports of PageSpeed performance scores.",
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
         "-f", "--url-file",
         type=str,
         required=True,
-        help="Path to a file containing a list of URLs to include in the summary."
+        help="Path to a file containing a list of URLs."
     )
-    period_group = parser.add_mutually_exclusive_group(required=True)
+    parser.add_argument(
+        "--group-report",
+        action="store_true",
+        help="Generate a single HTML report of the latest scores, optionally grouped by a companion JSON file."
+    )
+    # Argument group for the historical summary report
+    period_group = parser.add_mutually_exclusive_group()
     period_group.add_argument(
         "--period",
         type=str,
         choices=['7d', '28d', 'this-month', 'last-month', 'all-time'],
-        help="Define the reporting period."
+        help="Define the reporting period for the historical summary."
     )
     period_group.add_argument(
         "--last-runs",
         type=int,
         metavar='N',
-        help="Report on the last N unique runs for each URL."
+        help="Report on the last N unique runs for each URL for the historical summary."
     )
     args = parser.parse_args()
 
+    # --- Group Report Mode ---
+    if args.group_report:
+        run_group_report(args)
+    # --- Default Historical Summary Mode ---
+    else:
+        # Validate that period or last-runs is provided if not in group-report mode
+        if not args.period and not args.last_runs:
+            parser.error("--period or --last-runs is required when --group-report is not specified.")
+        run_historical_summary(args)
+
+def run_group_report(args: argparse.Namespace):
+    """Generates a report of the latest scores for a list of URLs."""
     urls_to_process = load_urls(args.url_file)
-    print(f"🔎 Processing {len(urls_to_process)} URLs from file: {args.url_file}")
+    print(f"🔎 Processing {len(urls_to_process)} URLs from file: {args.url_file} for latest score report.")
+
+    # Derive ordering JSON filename
+    url_file_path = Path(args.url_file)
+    if not url_file_path.exists():
+        url_file_path = URL_LISTS_DIR / args.url_file
+    
+    ordering_json_path = url_file_path.parent / f"{url_file_path.stem}-ordering.json"
+    grouped_data = load_grouped_urls(str(ordering_json_path))
+
+    template_loader = FileSystemLoader(searchpath="./")
+    env = Environment(loader=template_loader)
+
+    def score_color_class(score):
+        try:
+            score = int(score)
+            if score >= 90: return "score-green"
+            if score >= 50: return "score-amber"
+            return "score-red"
+        except (ValueError, TypeError):
+            return ""
+    env.filters['score_color_class'] = score_color_class
+
+    report_name_base = url_file_path.stem
+    current_datetime_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_filename = REPORTS_DIR / f"latest-scores-{report_name_base}-{current_datetime_str}.html"
+
+    # --- Logic for Grouped/Ordered Report ---
+    if grouped_data:
+        print(f"📖 Found ordering file: {ordering_json_path}. Generating grouped report.")
+        
+        # Create a URL-to-group map for quick lookup
+        url_to_group_info = {item['URL']: item for item in grouped_data}
+        
+        # Prepare data structure that respects the order in the JSON file
+        ordered_groups = {}
+        for item in grouped_data:
+            company = item['Company']
+            if company not in ordered_groups:
+                ordered_groups[company] = []
+
+        for url in urls_to_process:
+            if url not in url_to_group_info:
+                print(f"[WARN] URL '{url}' from '{args.url_file}' not found in ordering file. Skipping.")
+                continue
+
+            group_info = url_to_group_info[url]
+            company = group_info['Company']
+
+            desktop_data = get_latest_pagespeed_data(url, "desktop")
+            mobile_data = get_latest_pagespeed_data(url, "mobile")
+
+            ordered_groups[company].append({
+                "type": group_info['Type'],
+                "url": url,
+                "desktop_score": desktop_data['score'] if desktop_data else "N/A",
+                "mobile_score": mobile_data['score'] if mobile_data else "N/A"
+            })
+        
+        template_str = GROUPED_REPORT_TEMPLATE
+        html_output = env.from_string(template_str).render(
+            grouped_results=ordered_groups,
+            generation_date=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
+
+    # --- Logic for Simple (Ungrouped) Report ---
+    else:
+        print(f"📖 Ordering file not found. Generating simple report.")
+        results = []
+        for url in urls_to_process:
+            desktop_data = get_latest_pagespeed_data(url, "desktop")
+            mobile_data = get_latest_pagespeed_data(url, "mobile")
+            results.append({
+                "url": url,
+                "desktop_score": desktop_data['score'] if desktop_data else "N/A",
+                "mobile_score": mobile_data['score'] if mobile_data else "N/A"
+            })
+            
+        template_str = SIMPLE_REPORT_TEMPLATE
+        html_output = env.from_string(template_str).render(
+            results=results,
+            generation_date=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
+
+    with open(output_filename, "w", encoding="utf-8") as f:
+        f.write(html_output)
+    print(f"\n✅ Latest score report generated: {output_filename}")
+
+
+def run_historical_summary(args: argparse.Namespace):
+    """Generates a historical summary report with trend graphs."""
+    urls_to_process = load_urls(args.url_file)
+    print(f"🔎 Processing {len(urls_to_process)} URLs from file: {args.url_file} for historical summary.")
 
     start_date, end_date = None, datetime.date.today()
     if args.period:
@@ -217,14 +404,141 @@ def main():
         print("[ERROR] No data available to generate a summary report. Exiting.", file=sys.stderr)
         sys.exit(1)
 
-    # --- Graph Generation ---
     desktop_plot_html = create_summary_plot(all_dfs, 'desktop')
     mobile_plot_html = create_summary_plot(all_dfs, 'mobile')
 
-    # --- HTML Rendering ---
     template_loader = FileSystemLoader(searchpath="./")
     env = Environment(loader=template_loader)
-    template = env.from_string("""
+    
+    full_report_df = pd.concat(all_dfs)
+    min_date_obj = full_report_df['Date'].min()
+    max_date_obj = full_report_df['Date'].max()
+    
+    report_name_base = Path(args.url_file).stem
+    filename_suffix = f"{min_date_obj.strftime('%Y%m%d')}-{max_date_obj.strftime('%Y%m%d')}"
+    output_filename = REPORTS_DIR / f"summary-report-{report_name_base}-{filename_suffix}.html"
+
+    html_output = env.from_string(HISTORICAL_SUMMARY_TEMPLATE).render(
+        summary_data=summary_data,
+        period_display=args.period or f"Last {args.last_runs} runs",
+        desktop_plot=desktop_plot_html,
+        mobile_plot=mobile_plot_html,
+        generation_date=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+        start_date=min_date_obj.strftime('%Y-%m-%d'),
+        end_date=max_date_obj.strftime('%Y-%m-%d')
+    )
+
+    with open(output_filename, "w", encoding="utf-8") as f:
+        f.write(html_output)
+    
+    print(f"\n✅ Consolidated summary report generated: {output_filename}")
+
+
+# --- HTML Templates ---
+
+SIMPLE_REPORT_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Latest PageSpeed Scores</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
+        .container { max-width: 900px; margin: auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1 { color: #0056b3; text-align: center; }
+        .report-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .report-table th, .report-table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        .report-table th { background-color: #0056b3; color: white; }
+        .report-table tr:nth-child(even) { background-color: #f2f2f2; }
+        .score-red { background-color: #ffcccc; }
+        .score-amber { background-color: #ffe0b3; }
+        .score-green { background-color: #ccffcc; }
+        .footer { text-align: center; margin-top: 30px; font-size: 0.8em; color: #777; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Latest PageSpeed Scores</h1>
+        <p style="text-align:center;">Generated: {{ generation_date }}</p>
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>URL</th>
+                    <th>Desktop Score</th>
+                    <th>Mobile Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in results %}
+                <tr>
+                    <td><a href="{{ item.url }}" target="_blank">{{ item.url }}</a></td>
+                    <td class="{{ item.desktop_score | score_color_class }}">{{ item.desktop_score }}</td>
+                    <td class="{{ item.mobile_score | score_color_class }}">{{ item.mobile_score }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="footer"><p>Generated by generate_summary_report.py</p></div>
+    </div>
+</body>
+</html>
+"""
+
+GROUPED_REPORT_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Latest PageSpeed Performance Report</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
+        .container { max-width: 1200px; margin: auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1, h2 { color: #0056b3; text-align: center; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; margin-bottom: 20px; }
+        h3 { color: #0056b3; margin-top: 30px; }
+        .report-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        .report-table th, .report-table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        .report-table th { background-color: #0056b3; color: white; }
+        .report-table tr:nth-child(even) { background-color: #f2f2f2; }
+        .score-red { background-color: #ffcccc; }
+        .score-amber { background-color: #ffe0b3; }
+        .score-green { background-color: #ccffcc; }
+        .footer { text-align: center; margin-top: 40px; font-size: 0.8em; color: #777; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Latest PageSpeed Performance Report</h1>
+        <p style="text-align:center;">Generated: {{ generation_date }}</p>
+        {% for company, urls in grouped_results.items() %}
+            <h3>{{ company }}</h3>
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>URL</th>
+                        <th>Desktop Score</th>
+                        <th>Mobile Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in urls %}
+                    <tr>
+                        <td>{{ item.type }}</td>
+                        <td><a href="{{ item.url }}" target="_blank">{{ item.url }}</a></td>
+                        <td class="{{ item.desktop_score | score_color_class }}">{{ item.desktop_score }}</td>
+                        <td class="{{ item.mobile_score | score_color_class }}">{{ item.mobile_score }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endfor %}
+        <div class="footer"><p>Generated by generate_summary_report.py</p></div>
+    </div>
+</body>
+</html>
+"""
+
+HISTORICAL_SUMMARY_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -286,30 +600,7 @@ def main():
     </div>
 </body>
 </html>
-""")
-
-    full_report_df = pd.concat(all_dfs)
-    min_date_obj = full_report_df['Date'].min()
-    max_date_obj = full_report_df['Date'].max()
-    
-    report_name_base = Path(args.url_file).stem
-    filename_suffix = f"{min_date_obj.strftime('%Y%m%d')}-{max_date_obj.strftime('%Y%m%d')}"
-    output_filename = REPORTS_DIR / f"summary-report-{report_name_base}-{filename_suffix}.html"
-
-    html_output = template.render(
-        summary_data=summary_data,
-        period_display=args.period or f"Last {args.last_runs} runs",
-        desktop_plot=desktop_plot_html,
-        mobile_plot=mobile_plot_html,
-        generation_date=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-        start_date=min_date_obj.strftime('%Y-%m-%d'),
-        end_date=max_date_obj.strftime('%Y-%m-%d')
-    )
-
-    with open(output_filename, "w", encoding="utf-8") as f:
-        f.write(html_output)
-    
-    print(f"\n✅ Consolidated summary report generated: {output_filename}")
+"""
 
 if __name__ == "__main__":
     main()
