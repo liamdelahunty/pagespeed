@@ -82,6 +82,20 @@ def extract_metrics_from_json(data: dict) -> Dict[str, object]:
         "SRT_ms": srt,
     }
 
+def score_style(score):
+    try:
+        score = int(score)
+        color = ""
+        if score >= 90:
+            color = "#6ECC00"  # Darker Green
+        elif score >= 50:
+            color = "#E5AC00"  # Darker Amber
+        else:
+            color = "#E54545"  # Darker Red
+        return f'style="background-color: {color}; text-align: center;"'
+    except (ValueError, TypeError):
+        return 'style="text-align: center;"'
+
 
 def get_timestamp_from_stem(stem: str) -> str:
     """Robustly extracts the timestamp from a filename stem."""
@@ -301,52 +315,115 @@ def main():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PageSpeed History Report - {{ report_title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
-        .container { max-width: 1200px; margin: auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        h1, h2, h3 { color: #0056b3; }
-        h1 { font-size: 2.2em; text-align: center; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; margin-bottom: 20px; }
-        h2 { font-size: 1.8em; border-bottom: 1px solid #e0e0e0; padding-bottom: 8px; margin-top: 40px;}
-        h3 { font-size: 1.4em; }
-        .url-section { margin-bottom: 40px; padding: 20px; background-color: #f9f9f9; border-left: 5px solid #007bff; border-radius: 4px; }
-        .plot-container, .table-container { margin-bottom: 30px; }
-        p { line-height: 1.6; }
-        .footer { text-align: center; margin-top: 50px; font-size: 0.8em; color: #777; }
-        .date-range { text-align: center; margin-bottom: 30px; font-style: italic; color: #555; }
-        .data-table { width: 100%; border-collapse: collapse; margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .data-table th, .data-table td { border: 1px solid #ddd; padding: 12px; text-align: center; }
-        .data-table th { background-color: #0056b3; color: white; font-weight: bold; }
-        .data-table tr:nth-child(even) { background-color: #f2f2f2; }
-        .data-table tr:hover { background-color: #e2e2e2; }
+        body {
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        .container {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        h1, h2, h3 {
+            color: #0056b3;
+        }
+        h1 {
+            font-size: 2.2em;
+            text-align: center;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .report-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .url-section {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background-color: #ffffff;
+            border-left: 5px solid #007bff;
+            border-radius: 0.25rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        .table-container, .plot-container {
+            margin-bottom: 1.5rem;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 3rem;
+            font-size: 0.8em;
+            color: #777;
+        }
+        /* Custom styles for Plotly to ensure responsiveness */
+        .plotly-graph-div {
+            margin: auto;
+        }
+        .table-fixed {
+            table-layout: fixed;
+            width: 100%;
+        }
+        .text-center {
+            text-align: center;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>PageSpeed History Report</h1>
-        <p class="date-range">Report Generated: {{ generation_date }} | Period: {{ period_display }} {% if start_date and end_date %}({{ start_date }} to {{ end_date }}){% endif %}</p>
-        {% for entry in report_data %}
-            <div class="url-section">
-                <h2>History for: <a href="{{ entry.url }}" target="_blank">{{ entry.url }}</a></h2>
-                <div class="table-container">
-                    <h3>Data Summary</h3>
-                    {{ entry.table | safe }}
+        <div class="report-header">
+            <h1 class="display-4">PageSpeed History Report</h1>
+            <p class="lead">Generated on {{ generation_date }}. {% if start_date == end_date %}Data from {{ start_date }}.{% else %}Data from {{ start_date }} to {{ end_date }}.{% endif %}</p>
+        </div>
+        
+        <div class="url-section">
+            <h2>History for: <a href="{{ url }}" target="_blank">{{ url }}</a></h2>
+            <div class="table-container">
+                <h3>Data Summary</h3>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover table-fixed">
+                        <thead class="table-light">
+                            <tr>
+                                {% for header in table_headers %}
+                                    <th scope="col" class="text-center">{{ header }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in table_data %}
+                            <tr>
+                                {% for header in table_headers %}
+                                    {% if 'Performance Score' in header %}
+                                        <td {{ row[header] | score_style }}>{{ row[header] }}</td>
+                                    {% else %}
+                                        <td class="text-center">{{ row[header] }}</td>
+                                    {% endif %}
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-                {% for plot_title, plot_html in entry.plots.items() %}
-                    <div class="plot-container">
-                        <h3>{{ plot_title.replace('_', ' ').replace('ms', '(ms)') }}</h3>
-                        {{ plot_html | safe }}
-                    </div>
-                {% endfor %}
             </div>
-        {% endfor %}
+            {% for plot_title, plot_html in plots.items() %}
+                <div class="plot-container">
+                    <h3>{{ plot_title.replace('_', ' ').replace('ms', '(ms)') }}</h3>
+                    {{ plot_html | safe }}
+                </div>
+            {% endfor %}
+        </div>
+
         <div class="footer">
             <p>Generated by generate_html_report.py | Learn more: <a href="https://developers.google.com/speed/docs/insights/v5/about" target="_blank">PageSpeed Insights Documentation</a> | <a href="https://googlechrome.github.io/lighthouse/viewer/" target="_blank">Lighthouse Report Viewer</a> | <a href="https://github.com/liamdelahunty/pagespeed" target="_blank">GitHub Repository</a></p>
         </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
 </body>
 </html>
 """)
+
+    env.filters['score_style'] = score_style
 
     # Process each URL and generate a separate report
     for url in urls_to_process:
@@ -356,22 +433,35 @@ def main():
             print(f"\n[WARN] No data found for {url} within the specified period. Skipping report generation.")
             continue
 
-        # --- Prepare data for a single URL report ---
-        report_data = []
-        
-        # Prepare data table
+        # Prepare data table for Jinja2 rendering
         table_df = df.copy()
         table_df['Date'] = pd.to_datetime(table_df['Date']).dt.strftime('%Y-%m-%d %H:%M')
-        pivot_df = table_df.pivot(index='Date', columns='Strategy', values=['PerformanceScore', 'LCP_ms', 'CLS', 'FCP_ms', 'TBT_ms'])
-        
-        new_columns = []
-        for col_name in pivot_df.columns:
-            metric_raw, strategy = col_name[0], col_name[1]
-            metric_formatted = metric_raw.replace("Score", " Score").replace("_ms", " (ms)").replace("_", " ")
-            new_columns.append(f"{metric_formatted.strip()} {strategy.capitalize()}")
-        pivot_df.columns = new_columns
-        pivot_df = pivot_df.reset_index()
-        data_table_html = pivot_df.to_html(classes='data-table', border=0, index=False, justify='center')
+
+        table_data_rows = []
+        # Get unique dates from the DataFrame
+        unique_dates = table_df['Date'].unique()
+
+        # Iterate through each unique date to build table rows
+        for date_str in unique_dates:
+            row_data = {"Date": date_str}
+            for metric in ['PerformanceScore', 'LCP_ms', 'CLS', 'FCP_ms', 'TBT_ms']:
+                for strategy in STRATEGIES:
+                    # Filter for the current date and strategy
+                    cell_value_series = table_df[(table_df['Date'] == date_str) & (table_df['Strategy'] == strategy)][metric]
+                    if not cell_value_series.empty:
+                        cell_value = cell_value_series.iloc[0]
+                    else:
+                        cell_value = "N/A" # Assign "N/A" if no data
+                    # Format column names for display
+                    col_name = f"{metric.replace('Score', ' Score').replace('_ms', ' (ms)').replace('_', ' ')} {strategy.capitalize()}"
+                    row_data[col_name] = cell_value
+            table_data_rows.append(row_data)
+
+        # Generate table headers dynamically
+        headers = ["Date"]
+        for metric in ['PerformanceScore', 'LCP_ms', 'CLS', 'FCP_ms', 'TBT_ms']:
+            for strategy in STRATEGIES:
+                headers.append(f"{metric.replace('Score', ' Score').replace('_ms', ' (ms)').replace('_', ' ')} {strategy.capitalize()}")
 
         # Generate plots
         plots = {
@@ -380,7 +470,6 @@ def main():
             "CLS": create_metric_plot(df, "CLS", f"Cumulative Layout Shift over Time"),
             # Add other plots as needed
         }
-        report_data.append({"url": url, "plots": plots, "table": data_table_html})
 
         # --- Render and Save Report ---
         report_name_base = urlparse(url).netloc.replace("www.", "").replace(".", "-")
@@ -395,7 +484,10 @@ def main():
             period_display=args.period or f"Last {args.last_runs} runs",
             start_date=report_start_date.strftime('%Y-%m-%d'),
             end_date=report_end_date.strftime('%Y-%m-%d'),
-            report_data=report_data
+            url=url,
+            table_data=table_data_rows,
+            table_headers=headers,
+            plots=plots
         )
 
         # --- Filename Generation ---
