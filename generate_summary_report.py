@@ -278,11 +278,11 @@ def run_group_report(args: argparse.Namespace):
             score = int(score)
             color = ""
             if score >= 90:
-                color = "#7CFC00"  # Green
+                color = "#6ECC00"  # Darker Green
             elif score >= 50:
-                color = "#FFBF00"  # Amber
+                color = "#E5AC00"  # Darker Amber
             else:
-                color = "#FF4D4D"  # Red
+                color = "#E54545"  # Darker Red
             return f'style="background-color: {color}; text-align: center;"'
         except (ValueError, TypeError):
             return 'style="text-align: center;"'
