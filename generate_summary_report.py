@@ -273,6 +273,22 @@ def run_group_report(args: argparse.Namespace):
     template_loader = FileSystemLoader(searchpath="./")
     env = Environment(loader=template_loader)
 
+    def score_style(score):
+        try:
+            score = int(score)
+            color = ""
+            if score >= 90:
+                color = "#7CFC00"  # Green
+            elif score >= 50:
+                color = "#FFBF00"  # Amber
+            else:
+                color = "#FF4D4D"  # Red
+            return f'style="background-color: {color}; text-align: center;"'
+        except (ValueError, TypeError):
+            return 'style="text-align: center;"'
+
+    env.filters['score_style'] = score_style
+
     def score_color_class(score):
         try:
             score = int(score)
@@ -460,48 +476,64 @@ SIMPLE_REPORT_TEMPLATE = """
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PageSpeed Insights Scores</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
-        .container { max-width: 900px; margin: auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        h1 { color: #0056b3; text-align: center; }
-        p.subtitle { text-align: center; color: #555; }
-        .report-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        .report-table th, .report-table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        .report-table th { background-color: #0056b3; color: white; }
-        .report-table tr:nth-child(even) { background-color: #f2f2f2; }
-        .score-red { background-color: #ffcccc; }
-        .score-amber { background-color: #ffe0b3; }
-        .score-green { background-color: #ccffcc; }
-        .footer { text-align: center; margin-top: 30px; font-size: 0.8em; color: #777; }
+        body {
+            background-color: #f8f9fa;
+        }
+        .score {
+            text-align: center;
+        }
+        .card-header {
+            background-color: #0d6efd;
+            color: white;
+        }
+        .container {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        .table {
+            table-layout: fixed;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>PageSpeed Insights Scores</h1>
-        <p class="subtitle">Report for data between {{ start_date }} and {{ end_date }}.<br>Generated on {{ generation_date }}</p>
-        <table class="report-table">
-            <thead>
-                <tr>
-                    <th>URL</th>
-                    <th>Desktop Score</th>
-                    <th>Mobile Score</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in results %}
-                <tr>
-                    <td><a href="{{ item.url }}" target="_blank">{{ item.url }}</a></td>
-                    <td class="{{ item.desktop_score | score_color_class }}">{{ item.desktop_score }}</td>
-                    <td class="{{ item.mobile_score | score_color_class }}">{{ item.mobile_score }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <div class="footer">
+        <div class="text-center mb-4">
+            <h1 class="display-4">PageSpeed Insights Scores</h1>
+            <p class="lead">Generated on {{ generation_date }}. {% if start_date == end_date %}Data from {{ start_date }}.{% else %}Data from {{ start_date }} to {{ end_date }}.{% endif %}</p>
+        </div>
+
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col">URL</th>
+                            <th scope="col" class="score" style="width: 20%;">Desktop Score</th>
+                            <th scope="col" class="score" style="width: 20%;">Mobile Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in results %}
+                        <tr>
+                            <td><a href="{{ item.url }}" target="_blank">{{ item.url }}</a></td>
+                            <td {{ item.desktop_score | score_style }}>{{ item.desktop_score }}</td>
+                            <td {{ item.mobile_score | score_style }}>{{ item.mobile_score }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="footer text-center mt-4 text-muted">
             <p>Generated by generate_summary_report.py | Learn more: <a href="https://developers.google.com/speed/docs/insights/v5/about" target="_blank">PageSpeed Insights Documentation</a> | <a href="https://googlechrome.github.io/lighthouse/viewer/" target="_blank">Lighthouse Report Viewer</a> | <a href="https://github.com/liamdelahunty/pagespeed" target="_blank">GitHub Repository</a></p>
         </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
 </body>
 </html>
 """
@@ -511,52 +543,71 @@ GROUPED_REPORT_TEMPLATE = """
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PageSpeed Insights Scores</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
-        .container { max-width: 1200px; margin: auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        h1 { color: #0056b3; text-align: center; }
-        p.subtitle { text-align: center; color: #555; }
-        .report-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        .report-table th, .report-table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        .report-table th { background-color: #0056b3; color: white; }
-        .report-table tr:nth-child(even) { background-color: #f2f2f2; }
-        .score-red { background-color: #ffcccc; }
-        .score-amber { background-color: #ffe0b3; }
-        .score-green { background-color: #ccffcc; }
-        .footer { text-align: center; margin-top: 40px; font-size: 0.8em; color: #777; }
+        body {
+            background-color: #f8f9fa;
+        }
+        .score {
+            text-align: center;
+        }
+        .card-header {
+            background-color: #0d6efd;
+            color: white;
+        }
+        .container {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        .table {
+            table-layout: fixed;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>PageSpeed Insights Scores</h1>
-        <p class="subtitle">Report for data between {{ start_date }} and {{ end_date }}.<br>Generated on {{ generation_date }}</p>
-        <table class="report-table">
-            <thead>
-                <tr>
-                    <th>Company</th>
-                    <th>Type</th>
-                    <th>URL</th>
-                    <th>Desktop Score</th>
-                    <th>Mobile Score</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in report_data %}
-                <tr>
-                    <td>{{ item.company }}</td>
-                    <td>{{ item.type }}</td>
-                    <td><a href="{{ item.url }}" target="_blank">{{ item.url }}</a></td>
-                    <td class="{{ item.desktop_score | score_color_class }}">{{ item.desktop_score }}</td>
-                    <td class="{{ item.mobile_score | score_color_class }}">{{ item.mobile_score }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <div class="footer">
-            <p>Generated by generate_summary_report.py | Learn more: <a href="https://developers.google.com/speed/docs/insights/v5/about" target="_blank">PageSpeed Insights Documentation</a> | <a href="https://googlechrome.github.io/lighthouse/viewer/" target="_blank">Lighthouse Report Viewer</a> | <a href="https://github.com/liamdelahunty/pagespeed" target="_blank">GitHub Repository</a></p>
+        <div class="text-center mb-4">
+            <h1 class="display-4">PageSpeed Insights Scores</h1>
+            <p class="lead">Generated on {{ generation_date }}. {% if start_date == end_date %}Data from {{ start_date }}.{% else %}Data from {{ start_date }} to {{ end_date }}.{% endif %}</p>
+        </div>
+
+        {% for item in report_data | groupby('company') %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h2 class="h5 mb-0">{{ item.grouper }}</h2>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col" style="width: 15%;">Type</th>
+                            <th scope="col">URL</th>
+                            <th scope="col" class="score" style="width: 15%;">Desktop Score</th>
+                            <th scope="col" class="score" style="width: 15%;">Mobile Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in item.list %}
+                        <tr>
+                            <td>{{ row.type }}</td>
+                            <td><a href="{{ row.url }}" target="_blank">{{ row.url }}</a></td>
+                            <td {{ row.desktop_score | score_style }}>{{ row.desktop_score }}</td>
+                            <td {{ row.mobile_score | score_style }}>{{ row.mobile_score }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+
+        <div class="footer text-center mt-4 text-muted">
+             <p>Generated by generate_summary_report.py | Learn more: <a href="https://developers.google.com/speed/docs/insights/v5/about" target="_blank">PageSpeed Insights Documentation</a> | <a href="https://googlechrome.github.io/lighthouse/viewer/" target="_blank">Lighthouse Report Viewer</a> | <a href="https://github.com/liamdelahunty/pagespeed" target="_blank">GitHub Repository</a></p>
         </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
 </body>
 </html>
 """
