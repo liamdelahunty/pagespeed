@@ -432,35 +432,58 @@ def main():
             print(f"\n[WARN] No data found for {url} within the specified period. Skipping report generation.")
             continue
 
-        # Prepare data table for Jinja2 rendering
-        table_df = df.copy()
-        table_df['Date'] = pd.to_datetime(table_df['Date']).dt.strftime('%Y-%m-%d %H:%M')
-
-        table_data_rows = []
-        # Get unique dates from the DataFrame
-        unique_dates = table_df['Date'].unique()
-
-        # Iterate through each unique date to build table rows
-        for date_str in unique_dates:
-            row_data = {"Date": date_str}
-            for metric in ['PerformanceScore', 'LCP_ms', 'CLS', 'FCP_ms', 'TBT_ms']:
-                for strategy in STRATEGIES:
-                    # Filter for the current date and strategy
-                    cell_value_series = table_df[(table_df['Date'] == date_str) & (table_df['Strategy'] == strategy)][metric]
-                    if not cell_value_series.empty:
-                        cell_value = cell_value_series.iloc[0]
-                    else:
-                        cell_value = "N/A" # Assign "N/A" if no data
-                    # Format column names for display
-                    col_name = f"{metric.replace('Score', ' Score').replace('_ms', ' (ms)').replace('_', ' ')} {strategy.capitalize()}"
-                    row_data[col_name] = cell_value
-            table_data_rows.append(row_data)
-
         # Generate table headers dynamically
         headers = ["Date"]
-        for metric in ['PerformanceScore', 'LCP_ms', 'CLS', 'FCP_ms', 'TBT_ms']:
+        metrics_to_display = ['PerformanceScore', 'LCP_ms', 'CLS', 'FCP_ms', 'TBT_ms']
+        for metric in metrics_to_display:
             for strategy in STRATEGIES:
                 headers.append(f"{metric.replace('Score', ' Score').replace('_ms', ' (ms)').replace('_', ' ')} {strategy.capitalize()}")
+
+        # Prepare data table for Jinja2 rendering, merging close runs
+        df['Date'] = pd.to_datetime(df['Date'])
+        df = df.sort_values('Date').reset_index(drop=True)
+
+        table_data_rows = []
+        processed_indices = set()
+
+        for i in range(len(df)):
+            if i in processed_indices:
+                continue
+
+            processed_indices.add(i)
+            row1 = df.iloc[i]
+            
+            # Initialize a new row with N/A values
+            row_data = {h: "N/A" for h in headers}
+            row_data['Date'] = row1['Date'].strftime('%Y-%m-%d %H:%M')
+            
+            # Populate with data from the first row in the pair
+            strategy1_cap = row1['Strategy'].capitalize()
+            for metric in metrics_to_display:
+                col_name = f"{metric.replace('Score', ' Score').replace('_ms', ' (ms)').replace('_', ' ')} {strategy1_cap}"
+                if metric in row1 and pd.notna(row1[metric]):
+                    row_data[col_name] = row1[metric]
+
+            # Look for a partner row within the time window
+            for j in range(i + 1, len(df)):
+                if j in processed_indices:
+                    continue
+
+                row2 = df.iloc[j]
+                if (row2['Strategy'] != row1['Strategy'] and 
+                    (row2['Date'] - row1['Date']) <= pd.Timedelta(minutes=15)):
+                    
+                    processed_indices.add(j)
+                    strategy2_cap = row2['Strategy'].capitalize()
+
+                    # Populate with data from the partner row
+                    for metric in metrics_to_display:
+                        col_name = f"{metric.replace('Score', ' Score').replace('_ms', ' (ms)').replace('_', ' ')} {strategy2_cap}"
+                        if metric in row2 and pd.notna(row2[metric]):
+                            row_data[col_name] = row2[metric]
+                    break 
+            
+            table_data_rows.append(row_data)
 
         # Generate plots
         plots = {
