@@ -167,6 +167,8 @@ Each report includes:
 *   Interactive line charts for all key PageSpeed metrics (Performance Score, LCP, CLS, etc.).
 *   A single-line header and footer with report metadata and helpful links.
 
+**Note on Data Merging:** The summary table now merges desktop and mobile runs into a single row if their execution timestamps are within a 15-minute window of each other. This provides a more consolidated view of performance for concurrent test runs. As a result, you may see fewer rows in the table than the total number of individual report files, as each merged row can represent two runs (one mobile, one desktop).
+
 ## 📊 Generating Consolidated Summary Reports
 The `generate_summary_report.py` script creates a high-level, consolidated summary of performance score trends for a list of URLs. It's designed to give a quick overview of how multiple sites are progressing over a specific period.
 
