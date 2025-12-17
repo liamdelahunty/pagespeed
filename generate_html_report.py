@@ -344,7 +344,6 @@ def main():
             margin-bottom: 2rem;
             padding: 1.5rem;
             background-color: #ffffff;
-            border-left: 5px solid #007bff;
             border-radius: 0.25rem;
             box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
         }
