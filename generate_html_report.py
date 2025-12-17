@@ -373,7 +373,7 @@ def main():
     <div class="container">
         <div class="report-header">
             <h1 class="display-4">PageSpeed History Report</h1>
-            <p class="lead">Generated on {{ generation_date }}. {% if start_date == end_date %}Data from {{ start_date }}.{% else %}Data from {{ start_date }} to {{ end_date }}.{% endif %}</p>
+            <p class="lead">Report Generated: {{ generation_date }} | Period: {{ period_display }} {% if start_date == end_date %}({{ start_date }}){% else %}({{ start_date }} to {{ end_date }}){% endif %}</p>
         </div>
         
         <div class="url-section">
