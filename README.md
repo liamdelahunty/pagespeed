@@ -170,7 +170,32 @@ Each report includes:
 **Note on Data Merging:** The summary table now merges desktop and mobile runs into a single row if their execution timestamps are within a 15-minute window of each other. This provides a more consolidated view of performance for concurrent test runs. As a result, you may see fewer rows in the table than the total number of individual report files, as each merged row can represent two runs (one mobile, one desktop).
 
 ## 📊 Generating Consolidated Summary Reports
-The `generate_summary_report.py` script creates a high-level, consolidated summary of performance score trends for a list of URLs. It's designed to give a quick overview of how multiple sites are progressing over a specific period.
+The `generate_summary_report.py` script creates a high-level, consolidated summary of performance score trends for a list of URLs. It's designed to give a quick overview of how multiple sites are progressing over a specific period, **generating a single HTML report for a group of URLs.**
+
+### Report Organisation with JSON (for `--group-report` flag)
+When using the `--group-report` flag, the script can leverage an optional companion JSON file (named `<your-url-file-stem>-ordering.json`) to define the layout and grouping of URLs within the report. This allows for a structured presentation, such as grouping URLs by company or type.
+
+**JSON Structure Example (`my-list-ordering.json`):**
+```json
+[
+  {
+    "Company": "Example Corp",
+    "Type": "Homepage",
+    "URL": "https://www.example.com/"
+  },
+  {
+    "Company": "Example Corp",
+    "Type": "Product Page",
+    "URL": "https://www.example.com/products"
+  },
+  {
+    "Company": "Another Company",
+    "Type": "Homepage",
+    "URL": "https://www.anothersite.org/"
+  }
+]
+```
+If this JSON file is found alongside your URL list file (e.g., `my-list.txt` and `my-list-ordering.json` in `url-lists/`), the report will be structured according to the "Company" groupings defined in the JSON. If no such JSON file is present, a simple ungrouped report will be generated.
 
 ### Usage
 This script requires a URL file and a time period.
