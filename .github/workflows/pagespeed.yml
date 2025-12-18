@@ -6,7 +6,7 @@ on:
   #   # Runs daily at 01:30 UTC (01:30 UK winter, 02:30 UK summer)
   #   - cron: '30 2 * * *'
   workflow_dispatch: # Allows manual trigger
-  
+
 jobs:
   pagespeed:
     runs-on:
@@ -46,14 +46,14 @@ jobs:
           mkdir -p reports debug-responses url-lists
           python pagespeed_to_csv.py --url-file urls.txt
 
-      - name: Generate comparison report
-        run: python compare_reports.py --with-graphs
+      # - name: Generate comparison report
+      #   run: python compare_reports.py --with-graphs
 
-      - name: Generate history report
-        run: python generate_html_report.py --url-file urls.txt --period 28d --with-graphs
+      # - name: Generate history report
+      #   run: python generate_html_report.py --url-file urls.txt --period 28d --with-graphs
 
-      - name: Generate summary report
-        run: python generate_summary_report.py -f urls.txt --period 28d
+      # - name: Generate summary report
+      #   run: python generate_summary_report.py -f urls.txt --period 28d
 
       - name: Upload reports as artifacts
         uses: actions/upload-artifact@v4
