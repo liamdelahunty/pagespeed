@@ -1,0 +1,100 @@
+# ──────────────────────────────────────────────────────────────
+# Python / general IDE artefacts
+# ──────────────────────────────────────────────────────────────
+# Byte‑compiled / optimized Python files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions (rare, but safe to ignore)
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+*.whl
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual‑environment directories (if you create one locally)
+venv/
+env/
+.venv/
+.virtualenv/
+ENV/
+env.bak/
+
+# ──────────────────────────────────────────────────────────────
+# Project‑specific artefacts
+# ──────────────────────────────────────────────────────────────
+# Environment variables – contains your secret API key
+.env
+.env.*
+bak/
+
+# Ad-hoc URL lists
+url-lists/
+
+# Ignore all text files...
+*.txt
+# ...but re-include the important ones
+!requirements.txt
+!how-to-python.txt
+
+# Debug / raw API responses (large JSON dumps you probably don’t want in Git)
+debug-responses/
+
+# The ongoing reports
+reports/
+
+# Generated CSV reports – they are reproducible from the script
+pagespeed‑report-*.csv
+pagespeed‑report-*.xlsx   # (if you export to Excel)
+
+# ──────────────────────────────────────────────────────────────
+# OS / editor specific files
+# ──────────────────────────────────────────────────────────────
+# macOS Finder metadata
+.DS_Store
+
+# Windows thumbnail cache
+Thumbs.db
+
+# Linux desktop files
+.desktop
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+*.swp
+*.swo
+.session
+
+# Temp & zip files, etc...
+*.7z
+*.class
+*.dll
+*.dmg
+*.docx
+*.exe
+*.gz
+*.iso
+*.jar
+*.log
+*.o
+*.rar
+*.sql
+*.sqlite
+*.tar
+*.tmp
+*.zip
+._*
+/temp
+/tmp
+
