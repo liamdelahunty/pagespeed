@@ -36,11 +36,11 @@ env.bak/
 .env.*
 bak/
 
-# Ad-hoc URL lists
-url-lists/
+# # Ad-hoc URL lists
+# url-lists/
 
 # Ignore all text files...
-*.txt
+# *.txt
 # ...but re-include the important ones
 !requirements.txt
 !how-to-python.txt
