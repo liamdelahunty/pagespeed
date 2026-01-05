@@ -1,10 +1,10 @@
 
-name: PageSpeed UK & IE Reports
+name: PageSpeed CA Reports
 
 on:
   # schedule:
-  # Runs daily at 21:00 UTC (21:00 UK winter, 22:00 UK summer)
-    - cron: '21 00 * * *'
+  # Runs daily at 02:00 UTC (02:00 UK winter, 03:00 UK summer)
+    - cron: '02 00 * * *'
   # workflow_dispatch: # Allows manual trigger
 
 jobs:
@@ -44,12 +44,12 @@ jobs:
       - name: Run PageSpeed batch
         run: |
           mkdir -p reports debug-responses url-lists
-          python pagespeed_to_csv.py --url-file uk-ie.txt
+          python pagespeed_to_csv.py --url-file ca.txt
 
       - name: Upload reports as artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: pagespeed-reports-uk-ie
+          name: pagespeed-reports-ca
           path: |
             reports/**/*.html
             reports/**/*.csv
