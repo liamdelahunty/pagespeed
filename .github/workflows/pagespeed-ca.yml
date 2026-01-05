@@ -2,9 +2,9 @@
 name: PageSpeed CA Reports
 
 on:
-  # schedule:
+  schedule:
   # Runs daily at 02:00 UTC (02:00 UK winter, 03:00 UK summer)
-    - cron: '02 00 * * *'
+  - cron: '02 00 * * *'
   # workflow_dispatch: # Allows manual trigger
 
 jobs:

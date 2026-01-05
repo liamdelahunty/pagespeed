@@ -2,9 +2,9 @@
 name: PageSpeed Cron Test Reports
 
 on:
-  # schedule:
+  schedule:
   # Runs daily at 20:00 UTC (20:00 UK winter, 21:00 UK summer)
-    - cron: '15 10 * * *'
+  - cron: '15 10 * * *'
   # workflow_dispatch: # Allows manual trigger
 
 jobs:

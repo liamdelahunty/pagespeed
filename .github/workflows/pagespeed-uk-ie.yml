@@ -2,9 +2,9 @@
 name: PageSpeed UK & IE Reports
 
 on:
-  # schedule:
+  schedule:
   # Runs daily at 21:00 UTC (21:00 UK winter, 22:00 UK summer)
-    - cron: '21 00 * * *'
+  - cron: '21 00 * * *'
   # workflow_dispatch: # Allows manual trigger
 
 jobs:
