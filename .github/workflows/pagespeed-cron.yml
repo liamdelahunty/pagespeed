@@ -5,7 +5,7 @@ on:
   schedule:
   # Runs daily at 20:00 UTC (20:00 UK winter, 21:00 UK summer)
   # mm HH Day MM Weekday
-  - cron: '36 * * * *'
+    - cron: '42 * * * *'
   # workflow_dispatch: # Allows manual trigger
 
 jobs:
