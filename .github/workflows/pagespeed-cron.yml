@@ -3,8 +3,8 @@ name: PageSpeed Cron Test Reports
 
 on:
   schedule:
-    # mm HH Day MM Weekday
     - cron: '15 16 * * *'
+    # mm HH Day MM Weekday
     # workflow_dispatch: # Allows manual trigger
 
 jobs:

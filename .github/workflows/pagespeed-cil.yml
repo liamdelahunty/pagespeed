@@ -3,9 +3,9 @@ name: PageSpeed CIL Reports
 
 on:
   schedule:
-  # Runs daily at 22:22 UTC
     - cron: '22 22 * * *'
-  # workflow_dispatch: # Allows manual trigger
+    # Runs daily at 22:22 UTC
+    # workflow_dispatch: # Allows manual trigger
 
 jobs:
   pagespeed:

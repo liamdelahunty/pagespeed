@@ -3,9 +3,9 @@ name: PageSpeed AU Reports
 
 on:
   schedule:
-  # Runs daily at 10:00 UTC (10:00 UK winter, 11:00 UK summer)
     - cron: '00 10 * * *'
-  # workflow_dispatch: # Allows manual trigger
+    # Runs daily at 10:00 UTC (10:00 UK winter, 11:00 UK summer)
+    # workflow_dispatch: # Allows manual trigger
 
 jobs:
   pagespeed:
