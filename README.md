@@ -72,6 +72,38 @@ If both `--url` and `--url-file` are provided, the single URL from `--url` takes
 * Save raw API responses under debug-responses/ (optional, for debugging).
 This can easily be read with the Lighthouse Viewer in the [Lighthouse Chrome Extension](https://chromewebstore.google.com/detail/lighthouse/blipmdconlkpinefehnmjammfjpmpbjk) or directly using the [Lighthouse viewer page](https://googlechrome.github.io/lighthouse/viewer/).
 
+### 💡 Typical Workflow
+
+While each script can be used independently, a common workflow for gathering data and generating reports looks like this:
+
+1.  **Gather Data:** Run `pagespeed_to_csv.py` to collect the latest PageSpeed Insights data for your desired URLs. This will populate the `debug-responses/` directory with raw JSON files.
+    ```sh
+    # Example: Collect data for URLs in group.txt
+    python pagespeed_to_csv.py --url-file group.txt
+    ```
+
+2.  **Organise Filenames (Optional but Recommended):** Run `organise_reports.py` to ensure all raw JSON files have a consistent naming convention. This helps the reporting scripts correctly identify and parse the data.
+    ```sh
+    python organise_reports.py
+    ```
+
+3.  **Generate Reports:** Choose one of the reporting scripts to visualize the data.
+    *   To see the latest scores for a group of sites, use `generate_summary_report.py` with the `--group-report` flag.
+        ```sh
+        # Example: Generate a report of the latest scores for group.txt
+        python generate_summary_report.py --group-report --url-file group.txt
+        ```
+    *   To see historical trends for a list of URLs in a single report, use `generate_summary_report.py` with a time period.
+        ```sh
+        # Example: Show the trend over the last 28 days for group.txt
+        python generate_summary_report.py -f group.txt --period 28d
+        ```
+    *   To get an in-depth, side-by-side comparison of all runs for a specific URL, use `compare_reports.py`.
+        ```sh
+        # Example: Compare all historical runs for a single URL
+        python compare_reports.py --url https://www.example.com --with-graphs
+        ```
+
 ## 📊 Comparing Reports
 The `compare_reports.py` script scans the raw JSON data in `debug-responses/` and generates a single, self-contained HTML report to show performance trends over time.
 
@@ -244,6 +276,21 @@ Skipped: Z files
 ```
 
 **Note:** It's recommended to back up your `debug-responses/` directory before running this script, although the script has been designed to avoid overwriting files.
+
+## 🤖 Continuous Monitoring with GitHub Actions
+
+This repository is configured to run PageSpeed Insights checks automatically using GitHub Actions. The workflow files located in the `.github/workflows/` directory define scheduled jobs (cron jobs) that execute the scripts for different regional websites.
+
+The following workflow files are included:
+
+*   `pagespeed-au.yml`: Runs daily checks for Australian sites.
+*   `pagespeed-ca.yml`: Runs daily checks for Canadian sites.
+*   `pagespeed-cil.yml`: Runs daily checks for Croner-i and legacy sites.
+*   `pagespeed-nz.yml`: Runs daily checks for New Zealand sites.
+*   `pagespeed-uk-ie.yml`: Runs daily checks for UK and Irish sites.
+*   `pagespeed.yml`: A general-purpose workflow that can be manually triggered to run checks.
+
+These workflows ensure that PageSpeed data is collected consistently over time, allowing for robust historical analysis. The collected data (raw JSON responses) is uploaded as a time-stamped artifact (e.g., `pagespeed-reports-2026-01-06-1230`) to the workflow run, which can be downloaded for local report generation.
 
 ## 📋 Configuration Notes  
 

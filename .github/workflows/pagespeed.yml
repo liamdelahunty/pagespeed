@@ -71,4 +71,3 @@ jobs:
             reports/**/*.html
             reports/**/*.csv
             debug-responses/**/*.json
-

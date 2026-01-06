@@ -46,10 +46,15 @@ jobs:
           mkdir -p reports debug-responses url-lists
           python pagespeed_to_csv.py --url-file nz.txt
 
+      # Add a step to get the current date and time and set it as an environment variable.
+      - name: Get current date
+        id: date
+        run: echo "DATE=$(date +'%Y-%m-%d-%H%S')" >> $GITHUB_ENV
+
       - name: Upload reports as artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: pagespeed-reports-nz
+          name: pagespeed-reports-nz-${{ env.DATE }}
           path: |
             reports/**/*.html
             reports/**/*.csv
