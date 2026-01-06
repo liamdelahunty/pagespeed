@@ -44,7 +44,7 @@ jobs:
       - name: Run PageSpeed batch
         run: |
           mkdir -p reports debug-responses url-lists
-          python pagespeed_to_csv.py --url https://www.
+          python pagespeed_to_csv.py --url https://www.accountantadvice.co.uk
 
       # python pagespeed_to_csv.py --url-file urls.txt
       # - name: Generate comparison report
