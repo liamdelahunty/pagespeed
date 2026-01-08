@@ -5,12 +5,11 @@ on:
   schedule:
     - cron: '00 08 * * *'
     # Runs daily at 08:00 UTC 
-    workflow_dispatch: # Allows manual trigger
+  workflow_dispatch: {} # Allows manual trigger
 
 jobs:
   pagespeed:
-    runs-on:
-      - codebuild-croner-codebuild-pagespeed-gh-runner-${{ github.run_id }}-${{ github.run_attempt }}
+    runs-on: codebuild-croner-codebuild-pagespeed-gh-runner-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
       - name: Checkout repo

@@ -9,8 +9,7 @@ on:
 
 jobs:
   pagespeed:
-    runs-on:
-      - codebuild-croner-codebuild-pagespeed-gh-runner-${{ github.run_id }}-${{ github.run_attempt }}
+    runs-on: codebuild-croner-codebuild-pagespeed-gh-runner-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
       - name: Checkout repo
