@@ -3,7 +3,7 @@ name: PageSpeed NZ Reports
 
 on:
   schedule:
-    - cron: '00 08 * * *'
+    # - cron: '00 08 * * *'
     # Runs daily at 08:00 UTC 
     # workflow_dispatch: # Allows manual trigger
 
