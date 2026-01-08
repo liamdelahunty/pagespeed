@@ -70,3 +70,15 @@ jobs:
             reports/**/*.html
             reports/**/*.csv
             debug-responses/**/*.json
+
+
+      # - name: Send email report
+      #   if: always() # Ensures this step runs even if previous steps fail
+      #   env:
+      #     SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      #     SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      #     SMTP_USER: ${{ secrets.SMTP_USER }}
+      #     SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      #     SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+      #     RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+      #   run: python send_email_report.py
