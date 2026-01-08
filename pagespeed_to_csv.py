@@ -241,7 +241,6 @@ def write_csv_header(csv_path: str):
     header = [
         "Date",
         "URL",
-        "Device",
         "Strategy",
         "PerfScore",
         "AccessibilityScore",
@@ -361,7 +360,6 @@ Contact: liam.delahunty (at) croneri.co.uk
                 csv_row = [
                     time.strftime("%Y-%m-%d %H:%M"),   # Date
                     url,
-                    "Desktop" if strat == "desktop" else "Mobile",
                     strat,
                     metrics["PerformanceScore"],
                     metrics["AccessibilityScore"],
@@ -387,7 +385,6 @@ Contact: liam.delahunty (at) croneri.co.uk
                 empty_row = [
                     time.strftime("%Y-%m-%d %H:%M"),
                     url,
-                    "Desktop" if strat == "desktop" else "Mobile",
                     strat,
                     "", "", "", "",  # 4 score columns
                     "", "", "", "", "", "", "", # 7 metric columns
@@ -409,7 +406,6 @@ Contact: liam.delahunty (at) croneri.co.uk
                 csv_row = [
                     time.strftime("%Y-%m-%d %H:%M"),   # Date
                     url,
-                    "Desktop" if strat == "desktop" else "Mobile",
                     strat,
                     metrics["PerformanceScore"],
                     metrics["AccessibilityScore"],
