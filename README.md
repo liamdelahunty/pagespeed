@@ -16,6 +16,19 @@ A Python utility that:
 * Automatically retries failed requests once at the end of the run.
 * Allows you to provide a URL without a scheme (e.g. `www.example.com`) to the `-u` flag.
 
+## Scripts and Their Outputs
+
+This project contains several Python scripts that form a data collection and reporting pipeline. Here is a summary of each script, its purpose, an example command, and the assets it produces.
+
+| Script | Purpose | Example Command | Generated Assets |
+| --- | --- | --- | --- |
+| **`pagespeed_to_csv.py`** | The core data collection script. It calls the PageSpeed Insights API and saves the raw data. | `python pagespeed_to_csv.py --url-file urls.txt` | <ul><li>`reports/pagespeed-report-urls-YYYY-MM-DD-HHMM.csv`</li><li>`debug-responses/.../...-YYYY-MM-DD-HHMMSS.json` (multiple files)</li></ul> |
+| **`organise_reports.py`** | A maintenance script that renames the raw JSON files in `debug-responses/` to a consistent format. | `python organise_reports.py` | Renamed JSON files in place. |
+| **`generate_summary_report.py`** | Generates a single HTML report summarizing data for multiple URLs. Has two modes: historical trend and latest scores. | `python generate_summary_report.py -f urls.txt --period 7d` | `reports/summary-report-urls-YYYYMMDD-YYYYMMDD.html` |
+| **`generate_html_report.py`** | Generates a detailed, individual HTML report for each URL, focusing on historical trends with graphs. | `python generate_html_report.py -f urls.txt --period 7d` | `reports/history-report-<site-name>-YYYYMMDD-YYYYMMDD.html` (one per URL) |
+| **`compare_reports.py`** | Generates a single HTML report comparing the first and last runs for multiple sites, showing the change over time. | `python compare_reports.py --from-file urls.txt --with-graphs` | `reports/comparison-report-from-urls-YYYY-MM-DD-HHMM.html` |
+| **`send_email_report.py`** | Sends an email summary based on the latest generated CSV report. | `python send_email_report.py` | An email sent to the configured recipient. (No file produced). |
+
 ## 📦 Prerequisites
 Python 3.8+ (official installer from https://python.org).
 
