@@ -221,6 +221,8 @@ def extract_metrics(data: dict) -> Dict[str, object]:
     tbt  = int(_get(["lighthouseResult", "audits", "total-blocking-time", "numericValue"], 0))
     cls  = float(_get(["lighthouseResult", "audits", "cumulative-layout-shift", "numericValue"], 0))
     srt  = int(_get(["lighthouseResult", "audits", "server-response-time", "numericValue"], 0))
+    # INP is field data from CrUX, not a Lighthouse audit.
+    inp = data.get('loadingExperience', {}).get('metrics', {}).get('INTERACTION_TO_NEXT_PAINT', {}).get('percentile', 0)
 
     return {
         "PerformanceScore": perf_score,
@@ -234,6 +236,7 @@ def extract_metrics(data: dict) -> Dict[str, object]:
         "TBT_ms": tbt,
         "CLS": round(cls, 4),
         "SRT_ms": srt,
+        "INP_ms": inp,
     }
 
 
@@ -253,6 +256,7 @@ def write_csv_header(csv_path: str):
         "TBT_ms",
         "CLS",
         "SRT_ms",
+        "INP_ms",
         "Notes",
     ]
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
@@ -372,6 +376,7 @@ Contact: liam.delahunty (at) croneri.co.uk
                     metrics["TBT_ms"],
                     metrics["CLS"],
                     metrics["SRT_ms"],
+                    metrics["INP_ms"],
                     "", # Notes
                 ]
 
@@ -418,6 +423,7 @@ Contact: liam.delahunty (at) croneri.co.uk
                     metrics["TBT_ms"],
                     metrics["CLS"],
                     metrics["SRT_ms"],
+                    metrics["INP_ms"],
                     "RETRY", # Notes
                 ]
 

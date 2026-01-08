@@ -40,6 +40,8 @@ def extract_metrics(data: dict) -> Dict[str, object]:
     tti  = int(_get(["lighthouseResult", "audits", "interactive", "numericValue"], 0))
     tbt  = int(_get(["lighthouseResult", "audits", "total-blocking-time", "numericValue"], 0))
     cls  = float(_get(["lighthouseResult", "audits", "cumulative-layout-shift", "numericValue"], 0))
+    # INP is field data from CrUX, not a Lighthouse audit.
+    inp = data.get('loadingExperience', {}).get('metrics', {}).get('INTERACTION_TO_NEXT_PAINT', {}).get('percentile', 0)
     
     return {
         "PerfScore": perf_score,
@@ -51,6 +53,7 @@ def extract_metrics(data: dict) -> Dict[str, object]:
         "TTI_ms": tti,
         "TBT_ms": tbt,
         "CLS": round(cls, 4),
+        "INP_ms": inp,
     }
 
 def group_timestamps(timestamp_strs, tolerance_seconds=120):
@@ -461,7 +464,7 @@ def generate_html_report(grouped_data: dict, deep_dive: bool = False, with_graph
         display_page = first.get("display_page", page)
 
         if deep_dive:
-            metrics_to_compare = ["PerfScore", "LCP_ms", "TBT_ms", "CLS"]
+            metrics_to_compare = ["PerfScore", "LCP_ms", "TBT_ms", "CLS", "INP_ms"]
         else:
             metrics_to_compare = ["PerfScore"]
         
@@ -502,7 +505,7 @@ def generate_html_report(grouped_data: dict, deep_dive: bool = False, with_graph
         url_groups[url_key][strategy] = reports
     
     if deep_dive:
-        metrics_to_show = ["PerfScore", "AccessibilityScore", "BestPracticesScore", "SEOScore", "LCP_ms", "TBT_ms", "CLS"]
+        metrics_to_show = ["PerfScore", "AccessibilityScore", "BestPracticesScore", "SEOScore", "LCP_ms", "TBT_ms", "CLS", "INP_ms"]
     else:
         metrics_to_show = ["PerfScore"]
 
