@@ -28,7 +28,7 @@ This project contains several Python scripts that form a data collection and rep
 | **`generate_html_report.py`** | Generates a detailed, individual HTML report for each URL, focusing on historical trends with graphs. | `python generate_html_report.py -f urls.txt --period 7d` | `reports/history-report-<site-name>-YYYYMMDD-YYYYMMDD.html` (one per URL) |
 | **`compare_reports.py`** | Generates a single HTML report comparing the first and last runs for multiple sites, showing the change over time. | `python compare_reports.py --from-file urls.txt --with-graphs` | `reports/comparison-report-from-urls-YYYY-MM-DD-HHMM.html` |
 | **`send_email_report.py`** | Sends an email summary based on the latest generated CSV report. | `python send_email_report.py` | An email sent to the configured recipient. (No file produced). |
-| **`retention.py`** | A maintenance script that prunes old report files from the `debug-responses/` and `reports/` directories based on a configurable retention policy. | `python retention.py debug-responses --dry-run` | <ul><li>`retention.log`</li><li>Optionally, a zip archive of pruned files.</li></ul> |
+| **`retention.py`** | A maintenance script that prunes old report files from the `debug-responses/` and `reports/` directories based on a configurable retention policy. | `python retention.py debug-responses --dry-run`<br>`python retention.py debug-responses --archive bak/debug-responses-achive-yyyy-mm-dd.zip` | <ul><li>`retention.log`</li><li>Optionally, a zip archive of pruned files.</li></ul> |
 
 ## 📦 Prerequisites
 Python 3.8+ (official installer from https://python.org).
