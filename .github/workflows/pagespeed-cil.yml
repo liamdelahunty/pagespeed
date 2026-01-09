@@ -1,10 +1,10 @@
 
-name: PageSpeed CIL Dato Reports
+name: PageSpeed Other CIL Sites Reports
 
 on:
   schedule:
-    - cron: '22 22 * * 0'
-    # Runs Sunday at 22:22 UTC
+    - cron: '21 21 * * *'
+    # Runs Daily at 21:21 UTC
   workflow_dispatch: {} # Allows manual trigger
 
 jobs:
@@ -43,7 +43,7 @@ jobs:
       - name: Run PageSpeed batch
         run: |
           mkdir -p reports debug-responses url-lists
-          python pagespeed_to_csv.py --url-file croneri-dato.txt
+          python pagespeed_to_csv.py --url-file cil.txt
 
       # Add a step to get the current date and time and set it as an environment variable.
       - name: Get current date
@@ -53,7 +53,7 @@ jobs:
       - name: Upload reports as artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: pagespeed-reports-cil-dato-${{ env.DATE }}
+          name: pagespeed-reports-cil-${{ env.DATE }}
           path: |
             reports/**/*.html
             reports/**/*.csv
