@@ -28,6 +28,7 @@ This project contains several Python scripts that form a data collection and rep
 | **`generate_html_report.py`** | Generates a detailed, individual HTML report for each URL, focusing on historical trends with graphs. | `python generate_html_report.py -f urls.txt --period 7d` | `reports/history-report-<site-name>-YYYYMMDD-YYYYMMDD.html` (one per URL) |
 | **`compare_reports.py`** | Generates a single HTML report comparing the first and last runs for multiple sites, showing the change over time. | `python compare_reports.py --from-file urls.txt --with-graphs` | `reports/comparison-report-from-urls-YYYY-MM-DD-HHMM.html` |
 | **`send_email_report.py`** | Sends an email summary based on the latest generated CSV report. | `python send_email_report.py` | An email sent to the configured recipient. (No file produced). |
+| **`retention.py`** | A maintenance script that prunes old report files from the `debug-responses/` and `reports/` directories based on a configurable retention policy. | `python retention.py debug-responses --dry-run` | <ul><li>`retention.log`</li><li>Optionally, a zip archive of pruned files.</li></ul> |
 
 ## 📦 Prerequisites
 Python 3.8+ (official installer from https://python.org).
@@ -289,6 +290,47 @@ Skipped: Z files
 ```
 
 **Note:** It's recommended to back up your `debug-responses/` directory before running this script, although the script has been designed to avoid overwriting files.
+
+## 🧹 Managing Data Retention
+The `retention.py` script is a powerful tool for managing the long-term storage of your PageSpeed data. Over time, the `debug-responses/` and `reports/` directories can grow very large. This script allows you to selectively prune old files based on a sophisticated retention policy, helping to control disk space usage while preserving a valuable history of your data.
+
+### Retention Policy
+The script applies the following rules:
+1.  **De-duplication:** It first ensures that for any given day, only the single latest report for each unique URL and strategy is kept.
+2.  **Tiered Retention:** On the de-duplicated dataset, it then applies a tiered retention policy:
+    *   **Keep all** reports from the last **90 days**.
+    *   Keep the **most recent report from each week** for data older than 90 days but newer than one year.
+    *   Keep the **most recent report from each month** for data older than one year.
+
+All operations are logged to `retention.log`.
+
+### How to Use the Script
+It is **strongly recommended** to perform a "dry run" before deleting or archiving any files to ensure the script is selecting the correct files for removal.
+
+**1. Perform a "Dry Run" (Recommended First Step)**
+This will simulate the process and show you which files would be removed, without actually touching them.
+*   For the `debug-responses` directory:
+    ```sh
+    python retention.py debug-responses --dry-run
+    ```
+*   For the `reports` directory:
+    ```sh
+    python retention.py reports --dry-run
+    ```
+
+**2. Delete Files**
+Once you have reviewed the dry run and are happy with the list of files to be pruned, you can run the script without the `--dry-run` flag to permanently delete them.
+*   For the `debug-responses` directory:
+    ```sh
+    python retention.py debug-responses
+    ```
+
+**3. Archive Files**
+If you prefer to archive the old files instead of deleting them, use the `--archive` flag and provide a name for the zip file. The script will move the pruned files into the archive and then delete them from their original location.
+*   To archive files from the `reports` directory:
+    ```sh
+    python retention.py reports --archive reports-archive.zip
+    ```
 
 ## 🤖 Continuous Monitoring with GitHub Actions
 
