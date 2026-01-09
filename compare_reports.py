@@ -11,6 +11,7 @@ import os
 import json
 import pathlib
 import argparse
+import configparser
 from typing import List, Dict
 from urllib.parse import urlparse
 from datetime import datetime, timedelta
@@ -116,6 +117,9 @@ def get_page_slug_from_path(json_path: pathlib.Path) -> str:
         except IndexError:
             return file_stem
 
+config = configparser.ConfigParser()
+config.read('config.ini')
+
 def main():
     """Finds JSON data, processes it, and generates an HTML report."""
     
@@ -157,7 +161,7 @@ def main():
 
     print("🔎 Starting report generation...")
     
-    base_dir = pathlib.Path("debug-responses")
+    base_dir = pathlib.Path(config['Paths']['debug_dir'])
     report_output_name_parts = []
     all_reports = []
     json_files = []
@@ -167,7 +171,7 @@ def main():
         url_list_path = pathlib.Path(args.url_file)
         # If the filename is provided without a directory path, assume it's in the 'url-lists' directory.
         if url_list_path.parent == pathlib.Path('.'):
-            url_list_path = pathlib.Path("url-lists") / url_list_path
+            url_list_path = pathlib.Path(config['Paths']['url_lists_dir']) / url_list_path
 
         if not url_list_path.is_file():
             print(f"❌ Error: URL file not found at '{url_list_path}'")
@@ -350,7 +354,7 @@ def main():
     html_content = generate_html_report(grouped_reports, args.deep_dive, args.with_graphs)
     
     # --- Prepare output directory and filename ---
-    reports_dir = pathlib.Path("reports")
+    reports_dir = pathlib.Path(config['Paths']['reports_dir'])
     reports_dir.mkdir(exist_ok=True)
     
     current_datetime = datetime.now().strftime("%Y-%m-%d-%H%M")

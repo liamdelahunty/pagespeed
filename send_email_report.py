@@ -2,10 +2,15 @@
 import os
 import smtplib
 import glob
+import configparser
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import pandas as pd
 from jinja2 import Environment, FileSystemLoader
+
+# --- Load Configuration ---
+config = configparser.ConfigParser()
+config.read('config.ini')
 
 def send_email_report():
     """
@@ -30,9 +35,10 @@ def send_email_report():
 
     # --- Find the latest report ---
     try:
-        list_of_files = glob.glob('reports/*.csv')
+        reports_dir = config['Paths']['reports_dir']
+        list_of_files = glob.glob(f'{reports_dir}/*.csv')
         if not list_of_files:
-            print("No CSV reports found in the 'reports' directory.")
+            print(f"No CSV reports found in the '{reports_dir}' directory.")
             return
         latest_file = max(list_of_files, key=os.path.getctime)
         print(f"Found latest report: {latest_file}")

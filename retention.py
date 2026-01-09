@@ -7,10 +7,14 @@ from collections import defaultdict
 import logging
 
 # --- Configuration ---
+import configparser
+
+config = configparser.ConfigParser()
+config.read('config.ini')
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[
-    logging.FileHandler("retention.log"),
+    logging.FileHandler(config['Retention']['log_file']),
     logging.StreamHandler()
 ])
 
@@ -86,8 +90,8 @@ def get_files_to_prune(directory):
     
     # 3. Apply retention policy (90 days, weekly, monthly)
     today = datetime.now()
-    ninety_days_ago = today - timedelta(days=90)
-    one_year_ago = today - timedelta(days=365)
+    ninety_days_ago = today - timedelta(days=int(config['Retention']['ninety_days']))
+    one_year_ago = today - timedelta(days=int(config['Retention']['one_year']))
 
     weekly_retention = defaultdict(lambda: (datetime.min, None))
     monthly_retention = defaultdict(lambda: (datetime.min, None))

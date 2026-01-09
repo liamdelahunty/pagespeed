@@ -18,14 +18,18 @@ from jinja2 import Environment, FileSystemLoader
 from typing import List, Dict, Any, Optional
 from urllib.parse import urlparse
 from pathlib import Path
+import configparser
 
 # --- Constants ---
-REPORTS_DIR = pathlib.Path("reports")
-DEBUG_RESPONSES_DIR = pathlib.Path("debug-responses")
-URL_LISTS_DIR = pathlib.Path("url-lists")
+config = configparser.ConfigParser()
+config.read('config.ini')
+
+REPORTS_DIR = pathlib.Path(config['Paths']['reports_dir'])
+DEBUG_RESPONSES_DIR = pathlib.Path(config['Paths']['debug_dir'])
+URL_LISTS_DIR = pathlib.Path(config['Paths']['url_lists_dir'])
 
 # Strategies we expect to find data for
-STRATEGIES = ("desktop", "mobile")
+STRATEGIES = tuple(s.strip() for s in config['API']['strategies'].split(','))
 
 # Ensure necessary directories exist
 REPORTS_DIR.mkdir(exist_ok=True)

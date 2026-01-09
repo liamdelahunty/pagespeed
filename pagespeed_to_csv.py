@@ -102,11 +102,18 @@ import argparse
 from typing import List, Dict
 from urllib.parse import urlparse
 from pathlib import Path
+import configparser
+
+# -------------------------------------------------
+# Load Configuration
+# -------------------------------------------------
+config = configparser.ConfigParser()
+config.read('config.ini')
 
 # -------------------------------------------------
 # Ensure the output directory exists
 # -------------------------------------------------
-REPORTS_DIR = pathlib.Path("reports")
+REPORTS_DIR = pathlib.Path(config['Paths']['reports_dir'])
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)   # creates ./reports if missing
 
 # -------------------------------------------------
@@ -117,11 +124,11 @@ API_KEY = os.getenv("PSI_API_KEY")
 if not API_KEY:
     raise RuntimeError("PSI_API_KEY not found - check your .env file.")
 
-API_ENDPOINT = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
+API_ENDPOINT = config['API']['endpoint']
 
 
 # Strategies we want to query - keep both unless you deliberately want only one.
-STRATEGIES = ("desktop", "mobile")
+STRATEGIES = tuple(s.strip() for s in config['API']['strategies'].split(','))
 
 
 # ----------------------------------------------------------------------
@@ -132,7 +139,7 @@ def load_urls(path: str) -> List[str]:
     file_path = Path(path)
     if not file_path.exists():
         # If the file is not found, check inside the 'url-lists' directory
-        file_path = Path("url-lists") / path
+        file_path = Path(config['Paths']['url_lists_dir']) / path
         if not file_path.exists():
             print(f"[ERROR] URL file '{path}' not found in the root or in the 'url-lists' directory.", file=sys.stderr)
             sys.exit(1)
@@ -153,15 +160,10 @@ def call_pagespeed(url: str, strategy: str) -> dict:
         "url": url,
         "strategy": strategy,
         "key": API_KEY,
-        "category": [
-            "performance",
-            "accessibility",
-            "best-practices",
-            "seo"
-        ],
+        "category": [c.strip() for c in config['API']['categories'].split(',')],
     }
     try:
-        r = requests.get(API_ENDPOINT, params=params, timeout=90)
+        r = requests.get(API_ENDPOINT, params=params, timeout=int(config['API']['timeout']))
         r.raise_for_status()
         return r.json()
     except requests.RequestException as exc:
@@ -183,7 +185,7 @@ def dump_response(data: dict, url: str, strategy: str, timestamp: str):
         page_slug = path.strip("/").replace("/", "_")
 
     # Create the nested directory structure, e.g., /debug-responses/example-com/
-    out_dir = pathlib.Path("debug-responses") / site_dir_name
+    out_dir = pathlib.Path(config['Paths']['debug_dir']) / site_dir_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # New filename includes the page slug for clear identification

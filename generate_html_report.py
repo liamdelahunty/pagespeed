@@ -10,17 +10,21 @@ from jinja2 import Environment, FileSystemLoader
 from typing import List, Dict
 from urllib.parse import urlparse
 from pathlib import Path
+import configparser
 
 # --- Constants ---
-REPORTS_DIR = pathlib.Path("reports")
-DEBUG_RESPONSES_DIR = pathlib.Path("debug-responses")
+config = configparser.ConfigParser()
+config.read('config.ini')
+
+REPORTS_DIR = pathlib.Path(config['Paths']['reports_dir'])
+DEBUG_RESPONSES_DIR = pathlib.Path(config['Paths']['debug_dir'])
 
 # Ensure output directories exist
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 DEBUG_RESPONSES_DIR.mkdir(parents=True, exist_ok=True)
 
 # Strategies we expect to find data for
-STRATEGIES = ("desktop", "mobile")
+STRATEGIES = tuple(s.strip() for s in config['API']['strategies'].split(','))
 
 # --- Helper Functions ---
 def load_urls(path: str) -> List[str]:
@@ -28,7 +32,7 @@ def load_urls(path: str) -> List[str]:
     file_path = Path(path)
     if not file_path.exists():
         # If the file is not found, check inside the 'url-lists' directory
-        file_path = Path("url-lists") / path
+        file_path = Path(config['Paths']['url_lists_dir']) / path
         if not file_path.exists():
             print(f"[ERROR] URL file '{path}' not found in the root or in the 'url-lists' directory.", file=sys.stderr)
             sys.exit(1)

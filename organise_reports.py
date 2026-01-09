@@ -15,7 +15,14 @@ import os
 import json
 import pathlib
 import datetime
+import configparser
 from urllib.parse import urlparse
+
+# -------------------------------------------------
+# Load Configuration
+# -------------------------------------------------
+config = configparser.ConfigParser()
+config.read('config.ini')
 
 def sanitise_timestamp(fetch_time: str) -> str:
     """
@@ -52,7 +59,7 @@ def get_slug_from_url(url: str) -> str:
 
 def organise_files():
     """Main logic for finding, parsing, and renaming files."""
-    base_dir = pathlib.Path("debug-responses")
+    base_dir = pathlib.Path(config['Paths']['debug_dir'])
     if not base_dir.exists():
         print(f"❌ Error: Directory '{base_dir}' not found. There is nothing to organise.")
         return
