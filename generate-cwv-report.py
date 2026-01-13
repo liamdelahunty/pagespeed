@@ -299,8 +299,49 @@ def main():
             continue
             
         df = pd.DataFrame(report_data)
+        df = df.sort_values('timestamp').reset_index(drop=True)
 
-        # Aggregate data for the bar chart
+        # --- Pivot Data ---
+        table_headers = ["Timestamp"]
+        metrics_to_display = ['lcp', 'fid', 'cls']
+        for metric in metrics_to_display:
+            for strategy in ["Mobile", "Desktop"]:
+                table_headers.append(f"{metric.upper()} {strategy}")
+
+        table_data_rows = []
+        processed_indices = set()
+
+        for i in range(len(df)):
+            if i in processed_indices:
+                continue
+            processed_indices.add(i)
+            
+            row1 = df.iloc[i]
+            row_data = {h: "N/A" for h in table_headers}
+            row_data['Timestamp'] = row1['timestamp'].strftime('%Y-%m-%d %H:%M')
+            
+            for metric in metrics_to_display:
+                col_name = f"{metric.upper()} {row1['strategy']}"
+                if metric in row1 and pd.notna(row1[metric]):
+                    row_data[col_name] = row1[metric]
+
+            # Find partner row
+            for j in range(i + 1, len(df)):
+                if j in processed_indices:
+                    continue
+                row2 = df.iloc[j]
+                if (row2['strategy'] != row1['strategy'] and 
+                    (row2['timestamp'] - row1['timestamp']) <= pd.Timedelta(minutes=15)):
+                    processed_indices.add(j)
+                    for metric in metrics_to_display:
+                        col_name = f"{metric.upper()} {row2['strategy']}"
+                        if metric in row2 and pd.notna(row2[metric]):
+                            row_data[col_name] = row2[metric]
+                    break
+            
+            table_data_rows.append(row_data)
+
+        # --- Aggregate data for the bar chart ---
         aggregated_data = {
             "lcp": {"Good": 0, "Needs Improvement": 0, "Poor": 0},
             "fid": {"Good": 0, "Needs Improvement": 0, "Poor": 0},
@@ -319,7 +360,7 @@ def main():
             aggregated_data["fid"][rating] = fid_counts.get(rating, 0)
             aggregated_data["cls"][rating] = cls_counts.get(rating, 0)
 
-        # Determine date range for filename and title
+        # --- Determine date range for filename and title ---
         min_date_obj = df['timestamp'].min()
         max_date_obj = df['timestamp'].max()
         min_date_str = min_date_obj.strftime('%Y%m%d')
@@ -332,8 +373,8 @@ def main():
 
         report_name_base = urlparse(url).netloc.replace("www.", "").replace(".", "-")
         
-        # Generate and save the report
-        report_content = create_html_report(df.sort_values(by="timestamp"), aggregated_data, report_name_base, date_range_display)
+        # --- Generate and save the report ---
+        report_content = create_html_report(table_data_rows, table_headers, aggregated_data, report_name_base, date_range_display)
         
         REPORTS_DIR.mkdir(exist_ok=True)
         report_filename = REPORTS_DIR / f"cwv-history-report-{report_name_base}-{filename_suffix}.html"
