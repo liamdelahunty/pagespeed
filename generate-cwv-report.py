@@ -206,7 +206,7 @@ def main():
     group.add_argument("-f", "--url-file", help="File with URLs.")
     group.add_argument("-u", "--url", help="Single URL.")
     period_group = parser.add_mutually_exclusive_group()
-    period_group.add_argument("--period", choices=['7d', '28d', 'this-month', 'last-month', 'all-time'], help="Reporting period.")
+    period_group.add_argument("--period", choices=['7d', '28d', 'this-month', 'last-month', 'all-time'], default='28d', help="Reporting period.")
     period_group.add_argument("--last-runs", type=int, metavar='N', help="Last N runs.")
     args = parser.parse_args()
 
