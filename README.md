@@ -26,6 +26,7 @@ This project contains several Python scripts that form a data collection and rep
 | **`organise_reports.py`** | A maintenance script that renames the raw JSON files in `debug-responses/` to a consistent format. | `python organise_reports.py` | Renamed JSON files in place. |
 | **`generate_summary_report.py`** | Generates a single HTML report summarizing data for multiple URLs. Has two modes: historical trend and latest scores. | `python generate_summary_report.py -f urls.txt --period 7d` | `reports/summary-report-urls-YYYYMMDD-YYYYMMDD.html` |
 | **`generate_html_report.py`** | Generates a detailed, individual HTML report for each URL, focusing on historical trends with graphs. | `python generate_html_report.py -f urls.txt --period 7d` | `reports/history-report-<site-name>-YYYYMMDD-YYYYMMDD.html` (one per URL) |
+| **`generate-cwv-report.py`** | Generates a summary HTML report for Core Web Vitals (LCP, FID, CLS) with a chart and detailed breakdown. | `python generate-cwv-report.py --report-name "all-sites"` | `reports/cwv-report-all-sites-YYYYMMDD.html` |
 | **`compare_reports.py`** | Generates a single HTML report comparing the first and last runs for multiple sites, showing the change over time. | `python compare_reports.py --from-file urls.txt --with-graphs` | `reports/comparison-report-from-urls-YYYY-MM-DD-HHMM.html` |
 | **`send_email_report.py`** | Sends an email summary based on the latest generated CSV report. | `python send_email_report.py` | An email sent to the configured recipient. (No file produced). |
 | **`retention.py`** | A maintenance script that prunes old report files from the `debug-responses/` and `reports/` directories based on a configurable retention policy. | `python retention.py debug-responses --dry-run`<br>`python retention.py debug-responses --archive bak/debug-responses-achive-yyyy-mm-dd.zip` | <ul><li>`retention.log`</li><li>Optionally, a zip archive of pruned files.</li></ul> |
@@ -262,7 +263,24 @@ The report contains:
 *   **Performance Trend Graphs:** Two consolidated line charts (one for Desktop, one for Mobile) showing the Performance Score trend for every URL, making it easy to compare sites against each other.
 *   **Score Change Summary:** A table detailing the change in performance for each URL and strategy, comparing the first and last data points in the selected period.
 
+## 📊 Generating Core Web Vitals (CWV) Reports
+The `generate-cwv-report.py` script scans the `debug-responses/` directory for raw JSON data and generates a single HTML report summarizing the Core Web Vitals (CWV) metrics.
 
+### Usage
+The script can be customized with the following flags:
+*   `--input-dir`: Specifies the directory containing the JSON report files. Defaults to `debug-responses/`.
+*   `--output-dir`: Specifies where the generated HTML report will be saved. Defaults to `reports/`.
+*   `--report-name`: A custom name used in the report's title and filename. Defaults to `all`.
+
+```sh
+# Generate a CWV report using default directories
+python generate-cwv-report.py --report-name "all-sites-quarterly"
+```
+
+### Output Report
+The script produces a single, self-contained HTML file named `cwv-report-<report-name>-<timestamp>.html`. This report includes:
+*   A bar chart visualizing the distribution of "Good," "Needs Improvement," and "Poor" scores for LCP, FID (using Max Potential FID), and CLS.
+*   A detailed table listing the specific metric values for each URL and strategy, with cells colour-coded based on performance.
 
 ## 🧹 Organising Raw Reports
 
