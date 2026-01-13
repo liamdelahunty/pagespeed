@@ -132,7 +132,7 @@ def create_cwv_plot(df: pd.DataFrame, metric_col: str, title: str) -> str:
     fig.update_layout(title_text=title, xaxis_title="Date", yaxis_title=metric_col.upper(), hovermode="x unified", template="plotly_white", height=400, margin=dict(l=50, r=50, b=50, t=50))
     return fig.to_html(full_html=False, include_plotlyjs='cdn')
 
-def create_html_report(table_data, table_headers, aggregated_data, report_name_base, date_range_str, plots):
+def create_html_report(table_data, table_headers, aggregated_data, url, date_range_str, plots, period_str):
     chart_data = json.dumps({
         "labels": ["LCP", "FID", "CLS"],
         "datasets": [
@@ -171,7 +171,7 @@ def create_html_report(table_data, table_headers, aggregated_data, report_name_b
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>CWV History: {report_name_base}</title>
+        <title>CWV History: {url}</title>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -183,7 +183,7 @@ def create_html_report(table_data, table_headers, aggregated_data, report_name_b
     </head>
     <body>
         <div class="container">
-            <div class="text-center mb-4"><h1>CWV History Report</h1><p class="lead">URL: <strong>{report_name_base}</strong> | {date_range_str}</p></div>
+            <div class="text-center mb-4"><h1>CWV History Report</h1><p class="lead"><strong><a href="{url}" target="_blank">{url}</a></strong> | {period_str}: {date_range_str}</p></div>
             <div class="chart-container"><canvas id="cwvChart"></canvas></div>
             {plots_html}
             <div class="card mt-5"><div class="card-header"><h2 class="h5 mb-0">Detailed History</h2></div>
@@ -281,13 +281,27 @@ def main():
         if min_date.date() == max_date.date(): date_display = f"on {min_date.strftime('%Y-%m-%d')}"
         
         name_base = urlparse(url).netloc.replace("www.", "").replace(".", "-")
+        
+        period_display_str = ""
+        if args.last_runs:
+            period_display_str = f"Last {args.last_runs} runs"
+        elif args.period:
+            period_map = {
+                '7d': 'Last 7 days',
+                '28d': 'Last 28 days',
+                'this-month': 'This month',
+                'last-month': 'Last month',
+                'all-time': 'All time'
+            }
+            period_display_str = period_map.get(args.period)
+
         plots = {
             "LCP Trend": create_cwv_plot(df, "lcp", "LCP Trend"),
             "FID Trend": create_cwv_plot(df, "fid", "FID Trend"),
             "CLS Trend": create_cwv_plot(df, "cls", "CLS Trend"),
         }
         
-        report_content = create_html_report(table_data_rows, table_headers, aggregated, name_base, date_display, plots)
+        report_content = create_html_report(table_data_rows, table_headers, aggregated, url, date_display, plots, period_display_str)
         report_filename = REPORTS_DIR / f"cwv-history-{name_base}-{date_suffix}.html"
         with open(report_filename, "w", encoding="utf-8") as f: f.write(report_content)
         print(f"  ✅ Report for {url}: {report_filename}")
