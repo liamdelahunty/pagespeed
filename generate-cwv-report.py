@@ -144,7 +144,7 @@ def process_json_file(file_path):
         "cls": audits.get("cumulative-layout-shift", {}).get("numericValue"),
     }
 
-def create_html_report(df, aggregated_data, report_name_base, date_range_str):
+def create_html_report(table_data, table_headers, aggregated_data, report_name_base, date_range_str):
     """Generates the HTML report string."""
     
     chart_data = json.dumps({
@@ -157,19 +157,34 @@ def create_html_report(df, aggregated_data, report_name_base, date_range_str):
     })
 
     table_rows = ""
-    for index, row in df.iterrows():
-        lcp_rating = get_metric_rating(row['lcp'], LCP_THRESHOLDS)
-        fid_rating = get_metric_rating(row['fid'], FID_THRESHOLDS)
-        cls_rating = get_metric_rating(row['cls'], CLS_THRESHOLDS)
-        table_rows += f"""
-        <tr>
-            <td>{row['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}</td>
-            <td>{row['strategy']}</td>
-            <td style="background-color: {get_rating_color(lcp_rating)}">{f"{row['lcp']:.0f} ms" if pd.notna(row['lcp']) else 'N/A'}</td>
-            <td style="background-color: {get_rating_color(fid_rating)}">{f"{row['fid']:.0f} ms" if pd.notna(row['fid']) else 'N/A'}</td>
-            <td style="background-color: {get_rating_color(cls_rating)}">{f"{row['cls']:.3f}" if pd.notna(row['cls']) else 'N/A'}</td>
-        </tr>
-        """
+    for row in table_data:
+        table_rows += "<tr>"
+        for header in table_headers:
+            value = row.get(header, "N/A")
+            rating_key = header.split(' ')[0].lower() + '_rating' # e.g., lcp_rating
+            
+            # Determine rating based on which column we are in
+            rating = "N/A"
+            if "LCP" in header and pd.notna(value):
+                rating = get_metric_rating(value, LCP_THRESHOLDS)
+            elif "FID" in header and pd.notna(value):
+                rating = get_metric_rating(value, FID_THRESHOLDS)
+            elif "CLS" in header and pd.notna(value):
+                rating = get_metric_rating(value, CLS_THRESHOLDS)
+
+            # Formatting
+            display_value = value
+            if isinstance(value, float):
+                if "CLS" in header:
+                    display_value = f"{value:.3f}"
+                else:
+                    display_value = f"{value:.0f} ms"
+            
+            table_rows += f'<td style="background-color: {get_rating_color(rating)}">{display_value}</td>'
+        table_rows += "</tr>"
+
+    # Generate header string
+    header_html = "".join(f"<th>{h}</th>" for h in table_headers)
 
     return f"""
     <!DOCTYPE html>
@@ -205,13 +220,7 @@ def create_html_report(df, aggregated_data, report_name_base, date_range_str):
                 <div class="table-responsive">
                     <table class="table table-striped table-hover mb-0">
                         <thead class="table-light">
-                            <tr>
-                                <th>Timestamp</th>
-                                <th>Strategy</th>
-                                <th>LCP</th>
-                                <th>FID (MPFID)</th>
-                                <th>CLS</th>
-                            </tr>
+                            <tr>{header_html}</tr>
                         </thead>
                         <tbody>
                             {table_rows}
