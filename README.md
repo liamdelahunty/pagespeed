@@ -26,7 +26,7 @@ This project contains several Python scripts that form a data collection and rep
 | **`organise_reports.py`** | A maintenance script that renames the raw JSON files in `debug-responses/` to a consistent format. | `python organise_reports.py` | Renamed JSON files in place. |
 | **`generate_summary_report.py`** | Generates a single HTML report summarizing data for multiple URLs. Has two modes: historical trend and latest scores. | `python generate_summary_report.py -f urls.txt --period 7d` | `reports/summary-report-urls-YYYYMMDD-YYYYMMDD.html` |
 | **`generate_html_report.py`** | Generates a detailed, individual HTML report for each URL, focusing on historical trends with graphs. | `python generate_html_report.py -f urls.txt --period 7d` | `reports/history-report-<site-name>-YYYYMMDD-YYYYMMDD.html` (one per URL) |
-| **`generate-cwv-report.py`** | Generates a summary HTML report for Core Web Vitals (LCP, FID, CLS) with a chart and detailed breakdown. | `python generate-cwv-report.py -f urls.txt --period 7d` | `reports/cwv-report-urls-YYYYMMDD-YYYYMMDD.html` |
+| **`generate-cwv-report.py`** | Generates a detailed, individual HTML report for each URL, focusing on historical Core Web Vitals trends with both a bar chart overview and Plotly line graphs. | `python generate-cwv-report.py -f urls.txt --period 7d` | `reports/cwv-history-report-<site-name>-YYYYMMDD-YYYYMMDD.html` (one per URL) |
 | **`compare_reports.py`** | Generates a single HTML report comparing the first and last runs for multiple sites, showing the change over time. | `python compare_reports.py --from-file urls.txt --with-graphs` | `reports/comparison-report-from-urls-YYYY-MM-DD-HHMM.html` |
 | **`send_email_report.py`** | Sends an email summary based on the latest generated CSV report. | `python send_email_report.py` | An email sent to the configured recipient. (No file produced). |
 | **`retention.py`** | A maintenance script that prunes old report files from the `debug-responses/` and `reports/` directories based on a configurable retention policy. | `python retention.py debug-responses --dry-run`<br>`python retention.py debug-responses --archive bak/debug-responses-achive-yyyy-mm-dd.zip` | <ul><li>`retention.log`</li><li>Optionally, a zip archive of pruned files.</li></ul> |
@@ -263,14 +263,14 @@ The report contains:
 *   **Performance Trend Graphs:** Two consolidated line charts (one for Desktop, one for Mobile) showing the Performance Score trend for every URL, making it easy to compare sites against each other.
 *   **Score Change Summary:** A table detailing the change in performance for each URL and strategy, comparing the first and last data points in the selected period.
 
-## 📊 Generating Core Web Vitals (CWV) Reports
-The `generate-cwv-report.py` script creates a summary HTML report focused on Core Web Vitals. It finds the relevant raw JSON data based on the URL and time period provided and generates a single, consolidated report.
+## 📊 Generating Core Web Vitals (CWV) History Reports
+The `generate-cwv-report.py` script creates a detailed, individual HTML report for each URL, focusing on historical Core Web Vitals (CWV) trends. It is similar in function to the `generate_html_report.py` script but focuses specifically on CWV metrics.
 
 ### Usage
-This script uses the same argument structure as other reporting scripts, requiring a URL source and an optional time frame.
+This script uses the same argument structure as other historical reporting scripts, requiring a URL source and an optional time frame.
 
 ```sh
-# Generate a CWV report for all URLs in 'uk-ie.txt' for the last 7 days
+# Generate a CWV history report for all URLs in 'uk-ie.txt' for the last 7 days
 python generate-cwv-report.py --url-file uk-ie.txt --period 7d
 
 # Generate a report for a single URL covering the last 5 runs
@@ -278,13 +278,14 @@ python generate-cwv-report.py --url https://www.example.com --last-runs 5
 ```
 
 ### Output Report
-The script produces a single HTML file named `cwv-report-<source>-<start_date>-<end_date>.html`.
-*   `<source>` is derived from the input URL or filename.
+The script produces one HTML file for each URL processed, named `cwv-history-report-<source>-<start_date>-<end_date>.html`.
+*   `<source>` is derived from the input URL.
 *   `<start_date>` and `<end_date>` reflect the date range of the data in the report.
 
-The report includes:
-*   A bar chart visualizing the distribution of "Good," "Needs Improvement," and "Poor" scores for LCP, FID (using Max Potential FID), and CLS across all the data found.
-*   A detailed table listing the specific metric values for each URL and strategy, with cells colour-coded based on performance.
+Each report includes:
+*   A **bar chart** visualizing the overall distribution of "Good," "Needs Improvement," and "Poor" scores for the URL.
+*   **Plotly line graphs** showing the historical trend for LCP, FID (using Max Potential FID), and CLS.
+*   A **detailed data table** that merges mobile and desktop runs into single rows for easy comparison.
 
 ## 🧹 Organising Raw Reports
 
