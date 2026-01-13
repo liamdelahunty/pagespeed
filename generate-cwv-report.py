@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 from pathlib import Path
 import configparser
 from typing import List, Optional
+import pandas as pd
 
 # --- Constants ---
 config = configparser.ConfigParser()
@@ -31,7 +32,7 @@ CLS_THRESHOLDS = {"good": 0.1, "ni": 0.25}  # Cumulative Layout Shift (unitless)
 
 def get_metric_rating(value, thresholds):
     """Categorizes a metric value as 'Good', 'Needs Improvement', or 'Poor'."""
-    if value is None:
+    if value is None or pd.isna(value):
         return "N/A"
     if value <= thresholds["good"]:
         return "Good"
@@ -42,12 +43,12 @@ def get_metric_rating(value, thresholds):
 def get_rating_color(rating):
     """Returns a color code based on the metric rating."""
     if rating == "Good":
-        return "#6ECC00"  # Green
+        return "#6ECC00"
     if rating == "Needs Improvement":
-        return "#E5AC00"  # Amber
+        return "#E5AC00"
     if rating == "Poor":
-        return "#E54545"  # Red
-    return "#808080" # Grey for N/A
+        return "#E54545"
+    return "#808080"
 
 def load_urls(path: str) -> List[str]:
     """Read URLs from a file, one per line, stripping whitespace."""
@@ -118,7 +119,6 @@ def find_report_files(url: str, start_date: Optional[datetime.date] = None, end_
             
     return sorted(files_to_return, key=lambda p: p.name)
 
-
 def process_json_file(file_path):
     """Processes a single PageSpeed JSON file to extract CWV data."""
     try:
@@ -129,26 +129,22 @@ def process_json_file(file_path):
         return None
 
     audits = data.get("lighthouseResult", {}).get("audits", {})
-
-    lcp_val = audits.get("largest-contentful-paint", {}).get("numericValue")
-    fid_val = audits.get("max-potential-fid", {}).get("numericValue") # Using MPFID as proxy
-    cls_val = audits.get("cumulative-layout-shift", {}).get("numericValue")
-    
-    url = data.get("id", "N/A")
-    strategy = data.get("lighthouseResult", {}).get("configSettings", {}).get("emulatedFormFactor", "N/A")
+    timestamp_str = get_timestamp_from_stem(file_path.stem)
+    try:
+        timestamp = datetime.datetime.strptime(timestamp_str, "%Y-%m-%d-%H%M%S")
+    except ValueError:
+        timestamp = datetime.datetime.strptime(timestamp_str, "%Y-%m-%d-%H%M")
 
     return {
-        "url": url,
-        "strategy": strategy.capitalize(),
-        "lcp": lcp_val,
-        "lcp_rating": get_metric_rating(lcp_val, LCP_THRESHOLDS),
-        "fid": fid_val,
-        "fid_rating": get_metric_rating(fid_val, FID_THRESHOLDS),
-        "cls": cls_val,
-        "cls_rating": get_metric_rating(cls_val, CLS_THRESHOLDS),
+        "timestamp": timestamp,
+        "url": data.get("id", "N/A"),
+        "strategy": data.get("lighthouseResult", {}).get("configSettings", {}).get("emulatedFormFactor", "N/A").capitalize(),
+        "lcp": audits.get("largest-contentful-paint", {}).get("numericValue"),
+        "fid": audits.get("max-potential-fid", {}).get("numericValue"),
+        "cls": audits.get("cumulative-layout-shift", {}).get("numericValue"),
     }
 
-def create_html_report(report_data, aggregated_data, report_name_base, date_range_str):
+def create_html_report(df, aggregated_data, report_name_base, date_range_str):
     """Generates the HTML report string."""
     
     chart_data = json.dumps({
@@ -161,14 +157,17 @@ def create_html_report(report_data, aggregated_data, report_name_base, date_rang
     })
 
     table_rows = ""
-    for item in report_data:
+    for index, row in df.iterrows():
+        lcp_rating = get_metric_rating(row['lcp'], LCP_THRESHOLDS)
+        fid_rating = get_metric_rating(row['fid'], FID_THRESHOLDS)
+        cls_rating = get_metric_rating(row['cls'], CLS_THRESHOLDS)
         table_rows += f"""
         <tr>
-            <td><a href="{item['url']}" target="_blank" title="{item['url']}">{item['url']}</a></td>
-            <td>{item['strategy']}</td>
-            <td style="background-color: {get_rating_color(item['lcp_rating'])}">{f"{item['lcp']:.0f} ms" if item['lcp'] is not None else 'N/A'}</td>
-            <td style="background-color: {get_rating_color(item['fid_rating'])}">{f"{item['fid']:.0f} ms" if item['fid'] is not None else 'N/A'}</td>
-            <td style="background-color: {get_rating_color(item['cls_rating'])}">{f"{item['cls']:.3f}" if item['cls'] is not None else 'N/A'}</td>
+            <td>{row['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}</td>
+            <td>{row['strategy']}</td>
+            <td style="background-color: {get_rating_color(lcp_rating)}">{f"{row['lcp']:.0f} ms" if pd.notna(row['lcp']) else 'N/A'}</td>
+            <td style="background-color: {get_rating_color(fid_rating)}">{f"{row['fid']:.0f} ms" if pd.notna(row['fid']) else 'N/A'}</td>
+            <td style="background-color: {get_rating_color(cls_rating)}">{f"{row['cls']:.3f}" if pd.notna(row['cls']) else 'N/A'}</td>
         </tr>
         """
 
@@ -178,7 +177,7 @@ def create_html_report(report_data, aggregated_data, report_name_base, date_rang
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Core Web Vitals Report: {report_name_base}</title>
+        <title>CWV History Report: {report_name_base}</title>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
         <style>
@@ -186,14 +185,13 @@ def create_html_report(report_data, aggregated_data, report_name_base, date_rang
             .container {{ padding-top: 2rem; padding-bottom: 2rem; }}
             .chart-container {{ max-width: 800px; margin: 2rem auto; }}
             td, th {{ text-align: center; vertical-align: middle; }}
-            td a {{ display: block; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
         </style>
     </head>
     <body>
         <div class="container">
             <div class="text-center mb-4">
-                <h1 class="display-5">Core Web Vitals Report</h1>
-                <p class="lead">Report for: <strong>{report_name_base}</strong> | {date_range_str}</p>
+                <h1 class="display-5">Core Web Vitals History Report</h1>
+                <p class="lead">URL: <strong>{report_name_base}</strong> | {date_range_str}</p>
             </div>
             
             <div class="chart-container">
@@ -202,13 +200,13 @@ def create_html_report(report_data, aggregated_data, report_name_base, date_rang
 
             <div class="card mt-5">
                 <div class="card-header">
-                    <h2 class="h5 mb-0">Detailed Report</h2>
+                    <h2 class="h5 mb-0">Detailed History</h2>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-striped table-hover mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>URL</th>
+                                <th>Timestamp</th>
                                 <th>Strategy</th>
                                 <th>LCP</th>
                                 <th>FID (MPFID)</th>
@@ -262,12 +260,7 @@ def main():
     
     args = parser.parse_args()
 
-    if args.url:
-        urls_to_process = [args.url]
-        report_name_base = urlparse(args.url).netloc.replace("www.", "").replace(".", "-")
-    else:
-        urls_to_process = load_urls(args.url_file)
-        report_name_base = Path(args.url_file).stem
+    urls_to_process = [args.url] if args.url else load_urls(args.url_file)
 
     start_date, end_date = None, datetime.date.today()
     if args.period:
@@ -280,59 +273,66 @@ def main():
             start_date = end_date.replace(day=1)
         elif args.period == 'all-time': start_date = None
 
-    print(f"🔎 Processing {len(urls_to_process)} URL(s) for CWV report...")
+    print(f"🔎 Processing {len(urls_to_process)} URL(s) for CWV reports...")
     
-    all_files_to_process = []
     for url in urls_to_process:
-        files = find_report_files(url, start_date, end_date, args.last_runs)
-        if not files:
-            print(f"  - No data found for {url}")
-        all_files_to_process.extend(files)
+        files_to_process = find_report_files(url, start_date, end_date, args.last_runs)
+        
+        if not files_to_process:
+            print(f"  - No data found for {url}. Skipping.")
+            continue
 
-    if not all_files_to_process:
-        print("\nNo data files found for the specified URLs and period. Exiting.")
-        return
+        report_data = [process_json_file(f) for f in files_to_process if f]
+        report_data = [d for d in report_data if d is not None]
 
-    report_data = []
-    for file_path in all_files_to_process:
-        data = process_json_file(file_path)
-        if data:
-            report_data.append(data)
+        if not report_data:
+            print(f"  - Could not extract valid data for {url}. Skipping.")
+            continue
+            
+        df = pd.DataFrame(report_data)
 
-    if not report_data:
-        print("\nCould not extract valid CWV data from the found files. Exiting.")
-        return
+        # Aggregate data for the bar chart
+        aggregated_data = {
+            "lcp": {"Good": 0, "Needs Improvement": 0, "Poor": 0},
+            "fid": {"Good": 0, "Needs Improvement": 0, "Poor": 0},
+            "cls": {"Good": 0, "Needs Improvement": 0, "Poor": 0},
+        }
+        df['lcp_rating'] = df['lcp'].apply(lambda x: get_metric_rating(x, LCP_THRESHOLDS))
+        df['fid_rating'] = df['fid'].apply(lambda x: get_metric_rating(x, FID_THRESHOLDS))
+        df['cls_rating'] = df['cls'].apply(lambda x: get_metric_rating(x, CLS_THRESHOLDS))
 
-    # Aggregate data for the chart
-    aggregated_data = {
-        "lcp": {"Good": 0, "Needs Improvement": 0, "Poor": 0},
-        "fid": {"Good": 0, "Needs Improvement": 0, "Poor": 0},
-        "cls": {"Good": 0, "Needs Improvement": 0, "Poor": 0},
-    }
-    for item in report_data:
-        if item["lcp_rating"] != "N/A": aggregated_data["lcp"][item["lcp_rating"]] += 1
-        if item["fid_rating"] != "N/A": aggregated_data["fid"][item["fid_rating"]] += 1
-        if item["cls_rating"] != "N/A": aggregated_data["cls"][item["cls_rating"]] += 1
+        lcp_counts = df['lcp_rating'].value_counts().to_dict()
+        fid_counts = df['fid_rating'].value_counts().to_dict()
+        cls_counts = df['cls_rating'].value_counts().to_dict()
 
-    # Determine date range for filename and title
-    timestamps = [datetime.datetime.strptime(get_timestamp_from_stem(f.stem), "%Y-%m-%d-%H%M%S") for f in all_files_to_process if get_timestamp_from_stem(f.stem)]
-    min_date = min(timestamps).strftime('%Y%m%d') if timestamps else "nodata"
-    max_date = max(timestamps).strftime('%Y%m%d') if timestamps else "nodata"
-    filename_suffix = f"{min_date}-{max_date}"
-    date_range_str = f"Data from {min_date} to {max_date}"
-    if min_date == max_date:
-        date_range_str = f"Data from {min_date}"
-    
-    # Generate and save the report
-    report_content = create_html_report(report_data, aggregated_data, report_name_base, date_range_str)
-    
-    REPORTS_DIR.mkdir(exist_ok=True)
-    report_filename = REPORTS_DIR / f"cwv-report-{report_name_base}-{filename_suffix}.html"
-    
-    with open(report_filename, "w", encoding="utf-8") as f:
-        f.write(report_content)
+        for rating in ["Good", "Needs Improvement", "Poor"]:
+            aggregated_data["lcp"][rating] = lcp_counts.get(rating, 0)
+            aggregated_data["fid"][rating] = fid_counts.get(rating, 0)
+            aggregated_data["cls"][rating] = cls_counts.get(rating, 0)
 
-    print(f"\n✅ Successfully generated CWV report: {report_filename}")
+        # Determine date range for filename and title
+        min_date_obj = df['timestamp'].min()
+        max_date_obj = df['timestamp'].max()
+        min_date_str = min_date_obj.strftime('%Y%m%d')
+        max_date_str = max_date_obj.strftime('%Y%m%d')
+        filename_suffix = f"{min_date_str}-{max_date_str}"
+        
+        date_range_display = f"Data from {min_date_obj.strftime('%Y-%m-%d')} to {max_date_obj.strftime('%Y-%m-%d')}"
+        if min_date_str == max_date_str:
+            date_range_display = f"Data from {min_date_obj.strftime('%Y-%m-%d')}"
+
+        report_name_base = urlparse(url).netloc.replace("www.", "").replace(".", "-")
+        
+        # Generate and save the report
+        report_content = create_html_report(df.sort_values(by="timestamp"), aggregated_data, report_name_base, date_range_display)
+        
+        REPORTS_DIR.mkdir(exist_ok=True)
+        report_filename = REPORTS_DIR / f"cwv-history-report-{report_name_base}-{filename_suffix}.html"
+        
+        with open(report_filename, "w", encoding="utf-8") as f:
+            f.write(report_content)
+
+        print(f"  ✅ Successfully generated CWV report for {url}: {report_filename}")
 
 if __name__ == "__main__":
     main()
