@@ -10,17 +10,21 @@ from jinja2 import Environment, FileSystemLoader
 from typing import List, Dict
 from urllib.parse import urlparse
 from pathlib import Path
+import configparser
 
 # --- Constants ---
-REPORTS_DIR = pathlib.Path("reports")
-DEBUG_RESPONSES_DIR = pathlib.Path("debug-responses")
+config = configparser.ConfigParser()
+config.read('config.ini')
+
+REPORTS_DIR = pathlib.Path(config['Paths']['reports_dir'])
+DEBUG_RESPONSES_DIR = pathlib.Path(config['Paths']['debug_dir'])
 
 # Ensure output directories exist
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 DEBUG_RESPONSES_DIR.mkdir(parents=True, exist_ok=True)
 
 # Strategies we expect to find data for
-STRATEGIES = ("desktop", "mobile")
+STRATEGIES = tuple(s.strip() for s in config['API']['strategies'].split(','))
 
 # --- Helper Functions ---
 def load_urls(path: str) -> List[str]:
@@ -28,7 +32,7 @@ def load_urls(path: str) -> List[str]:
     file_path = Path(path)
     if not file_path.exists():
         # If the file is not found, check inside the 'url-lists' directory
-        file_path = Path("url-lists") / path
+        file_path = Path(config['Paths']['url_lists_dir']) / path
         if not file_path.exists():
             print(f"[ERROR] URL file '{path}' not found in the root or in the 'url-lists' directory.", file=sys.stderr)
             sys.exit(1)
@@ -67,6 +71,8 @@ def extract_metrics_from_json(data: dict) -> Dict[str, object]:
     tbt  = int(_get(["lighthouseResult", "audits", "total-blocking-time", "numericValue"], 0))
     cls  = float(_get(["lighthouseResult", "audits", "cumulative-layout-shift", "numericValue"], 0))
     srt  = int(_get(["lighthouseResult", "audits", "server-response-time", "numericValue"], 0))
+    # INP is field data from CrUX, not a Lighthouse audit.
+    inp = data.get('loadingExperience', {}).get('metrics', {}).get('INTERACTION_TO_NEXT_PAINT', {}).get('percentile', 0)
 
     return {
         "PerformanceScore": perf_score,
@@ -80,6 +86,7 @@ def extract_metrics_from_json(data: dict) -> Dict[str, object]:
         "TBT_ms": tbt,
         "CLS": round(cls, 4),
         "SRT_ms": srt,
+        "INP_ms": inp,
     }
 
 def score_style(score):
@@ -434,7 +441,7 @@ def main():
 
         # Generate table headers dynamically
         headers = ["Date"]
-        metrics_to_display = ['PerformanceScore', 'LCP_ms', 'CLS', 'FCP_ms', 'TBT_ms']
+        metrics_to_display = ['PerformanceScore', 'LCP_ms', 'CLS', 'INP_ms', 'FCP_ms', 'TBT_ms']
         for metric in metrics_to_display:
             for strategy in STRATEGIES:
                 headers.append(f"{metric.replace('Score', ' Score').replace('_ms', ' (ms)').replace('_', ' ')} {strategy.capitalize()}")
@@ -490,6 +497,7 @@ def main():
             "PerformanceScore": create_metric_plot(df, "PerformanceScore", f"Performance Score over Time"),
             "LCP_ms": create_metric_plot(df, "LCP_ms", f"Largest Contentful Paint (ms) over Time"),
             "CLS": create_metric_plot(df, "CLS", f"Cumulative Layout Shift over Time"),
+            "INP_ms": create_metric_plot(df, "INP_ms", f"Interaction to Next Paint (ms) over Time"),
             # Add other plots as needed
         }
 

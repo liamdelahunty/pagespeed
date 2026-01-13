@@ -16,6 +16,21 @@ A Python utility that:
 * Automatically retries failed requests once at the end of the run.
 * Allows you to provide a URL without a scheme (e.g. `www.example.com`) to the `-u` flag.
 
+## Scripts and Their Outputs
+
+This project contains several Python scripts that form a data collection and reporting pipeline. Here is a summary of each script, its purpose, an example command, and the assets it produces.
+
+| Script | Purpose | Example Command | Generated Assets |
+| --- | --- | --- | --- |
+| **`pagespeed_to_csv.py`** | The core data collection script. It calls the PageSpeed Insights API and saves the raw data. | `python pagespeed_to_csv.py --url-file urls.txt` | <ul><li>`reports/pagespeed-report-urls-YYYY-MM-DD-HHMM.csv`</li><li>`debug-responses/.../...-YYYY-MM-DD-HHMMSS.json` (multiple files)</li></ul> |
+| **`organise_reports.py`** | A maintenance script that renames the raw JSON files in `debug-responses/` to a consistent format. | `python organise_reports.py` | Renamed JSON files in place. |
+| **`generate_summary_report.py`** | Generates a single HTML report summarizing data for multiple URLs. Has two modes: historical trend and latest scores. | `python generate_summary_report.py -f urls.txt --period 7d` | `reports/summary-report-urls-YYYYMMDD-YYYYMMDD.html` |
+| **`generate_html_report.py`** | Generates a detailed, individual HTML report for each URL, focusing on historical trends with graphs. | `python generate_html_report.py -f urls.txt --period 7d` | `reports/history-report-<site-name>-YYYYMMDD-YYYYMMDD.html` (one per URL) |
+| **`generate-cwv-report.py`** | Generates a detailed, individual HTML report for each URL, focusing on historical Core Web Vitals trends with both a bar chart overview and Plotly line graphs. | `python generate-cwv-report.py -f urls.txt --period 7d` | `reports/cwv-history-report-<site-name>-YYYYMMDD-YYYYMMDD.html` (one per URL) |
+| **`compare_reports.py`** | Generates a single HTML report comparing the first and last runs for multiple sites, showing the change over time. | `python compare_reports.py --from-file urls.txt --with-graphs` | `reports/comparison-report-from-urls-YYYY-MM-DD-HHMM.html` |
+| **`send_email_report.py`** | Sends an email summary based on the latest generated CSV report. | `python send_email_report.py` | An email sent to the configured recipient. (No file produced). |
+| **`retention.py`** | A maintenance script that prunes old report files from the `debug-responses/` and `reports/` directories based on a configurable retention policy. | `python retention.py debug-responses --dry-run`<br>`python retention.py debug-responses --archive bak/debug-responses-achive-yyyy-mm-dd.zip` | <ul><li>`retention.log`</li><li>Optionally, a zip archive of pruned files.</li></ul> |
+
 ## 📦 Prerequisites
 Python 3.8+ (official installer from https://python.org).
 
@@ -248,7 +263,29 @@ The report contains:
 *   **Performance Trend Graphs:** Two consolidated line charts (one for Desktop, one for Mobile) showing the Performance Score trend for every URL, making it easy to compare sites against each other.
 *   **Score Change Summary:** A table detailing the change in performance for each URL and strategy, comparing the first and last data points in the selected period.
 
+## 📊 Generating Core Web Vitals (CWV) History Reports
+The `generate-cwv-report.py` script creates a detailed, individual HTML report for each URL, focusing on historical Core Web Vitals (CWV) trends. It is similar in function to the `generate_html_report.py` script but focuses specifically on CWV metrics.
 
+### Usage
+This script uses the same argument structure as other historical reporting scripts, requiring a URL source and an optional time frame.
+
+```sh
+# Generate a CWV history report for all URLs in 'uk-ie.txt' for the last 7 days
+python generate-cwv-report.py --url-file uk-ie.txt --period 7d
+
+# Generate a report for a single URL covering the last 5 runs
+python generate-cwv-report.py --url https://www.example.com --last-runs 5
+```
+
+### Output Report
+The script produces one HTML file for each URL processed, named `cwv-history-report-<source>-<start_date>-<end_date>.html`.
+*   `<source>` is derived from the input URL.
+*   `<start_date>` and `<end_date>` reflect the date range of the data in the report.
+
+Each report includes:
+*   A **bar chart** visualizing the overall distribution of "Good," "Needs Improvement," and "Poor" scores for the URL.
+*   **Plotly line graphs** showing the historical trend for LCP, FID (using Max Potential FID), and CLS.
+*   A **detailed data table** that merges mobile and desktop runs into single rows for easy comparison.
 
 ## 🧹 Organising Raw Reports
 
@@ -276,6 +313,47 @@ Skipped: Z files
 ```
 
 **Note:** It's recommended to back up your `debug-responses/` directory before running this script, although the script has been designed to avoid overwriting files.
+
+## 🧹 Managing Data Retention
+The `retention.py` script is a powerful tool for managing the long-term storage of your PageSpeed data. Over time, the `debug-responses/` and `reports/` directories can grow very large. This script allows you to selectively prune old files based on a sophisticated retention policy, helping to control disk space usage while preserving a valuable history of your data.
+
+### Retention Policy
+The script applies the following rules:
+1.  **De-duplication:** It first ensures that for any given day, only the single latest report for each unique URL and strategy is kept.
+2.  **Tiered Retention:** On the de-duplicated dataset, it then applies a tiered retention policy:
+    *   **Keep all** reports from the last **90 days**.
+    *   Keep the **most recent report from each week** for data older than 90 days but newer than one year.
+    *   Keep the **most recent report from each month** for data older than one year.
+
+All operations are logged to `retention.log`.
+
+### How to Use the Script
+It is **strongly recommended** to perform a "dry run" before deleting or archiving any files to ensure the script is selecting the correct files for removal.
+
+**1. Perform a "Dry Run" (Recommended First Step)**
+This will simulate the process and show you which files would be removed, without actually touching them.
+*   For the `debug-responses` directory:
+    ```sh
+    python retention.py debug-responses --dry-run
+    ```
+*   For the `reports` directory:
+    ```sh
+    python retention.py reports --dry-run
+    ```
+
+**2. Delete Files**
+Once you have reviewed the dry run and are happy with the list of files to be pruned, you can run the script without the `--dry-run` flag to permanently delete them.
+*   For the `debug-responses` directory:
+    ```sh
+    python retention.py debug-responses
+    ```
+
+**3. Archive Files**
+If you prefer to archive the old files instead of deleting them, use the `--archive` flag and provide a name for the zip file. The script will move the pruned files into the archive and then delete them from their original location.
+*   To archive files from the `reports` directory:
+    ```sh
+    python retention.py reports --archive reports-archive.zip
+    ```
 
 ## 🤖 Continuous Monitoring with GitHub Actions
 
